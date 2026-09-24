@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # thresholds
     severity_conf_min: float = 0.60
-    relevant_conf_min: float = 0.60
+    relevant_prob_min: float = 0.60
     noise_prob_max: float = 0.70
 
     # the editable policy sentence

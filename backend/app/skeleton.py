@@ -55,7 +55,7 @@ async def mock_run():
     scored = [ScoredChunk(chunk=c, verdict=v)
               for c, v in zip(chunks, mock_verdicts)]
     survivors = [s for s in scored if s.verdict.passes(
-        settings.severity_conf_min, settings.relevant_conf_min,
+        settings.severity_conf_min, settings.relevant_prob_min,
         settings.noise_prob_max)]
     _report(survivors)
 
