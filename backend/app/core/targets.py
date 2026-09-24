@@ -4,8 +4,11 @@ Version this file."""
 
 TARGETS = [
     {
-        "title": "Example customs — chemicals",
-        "url": "https://example.com/customs/chemicals",
+        "title": "Revenue — Customs Prohibitions & Restrictions",
+        "url": "https://www.revenue.ie/en/tax-professionals/tdm/customs/prohibitions-restrictions/index.aspx",
     },
-    # add more targets here
+    {
+        "title": "Irish Government News",
+        "url": "https://www.gov.ie/en/news/",
+    },
 ]

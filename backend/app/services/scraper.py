@@ -13,7 +13,7 @@ FIRECRAWL_URL = "https://api.firecrawl.dev/v2/scrape"
 async def scrape_with_diff(url: str) -> tuple[str, str | None]:
     """Returns (change_status, diff_text_or_None).
 
-    change_status is "new" | "unchanged" | "changed".
+    change_status is "new" | "same" | "changed" | "removed".
     diff_text is the git-diff string, present only when status == "changed".
     """
     payload = {

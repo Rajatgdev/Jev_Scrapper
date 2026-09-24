@@ -30,10 +30,12 @@ MOCK_DIFF = """@@ -1,4 +1,4 @@
 
 
 async def real_run():
-    t = TARGETS[0]
-    print(f"[real] scraping {t['url']}")
-    survivors = await pipeline.run_for_url(t["url"], t["title"])
-    _report(survivors)
+    all_survivors = []
+    for t in TARGETS:
+        print(f"[real] scraping {t['url']}")
+        survivors = await pipeline.run_for_url(t["url"], t["title"])
+        all_survivors.extend(survivors)
+    _report(all_survivors)
 
 
 async def mock_run():
@@ -60,6 +62,30 @@ async def mock_run():
     _report(survivors)
 
 
+async def jev_test_run():
+    """Send ONE hard-coded chunk to the REAL Jev API and print the raw verdict.
+    Proves the live Jev integration — auth, request shape, response parsing —
+    without scraping or waiting for a real page change."""
+    chunk = Chunk(
+        page_title="Import controls: chemicals",
+        page_url="https://example.gov/customs/chemicals",
+        old_text="Duty rate on listed substances: 0%",
+        new_text="Duty rate on listed substances: 5%",
+    )
+    print("[jev-test] sending one chunk to the real Jev API...")
+    print(f"  OLD: {chunk.old_text!r}")
+    print(f"  NEW: {chunk.new_text!r}\n")
+    v = await jev.evaluate(chunk)
+    print(f"{'='*54}\nRaw Jev verdict:")
+    print(f"  severity   : {v.severity}  (confidence {v.severity_conf:.2f})")
+    print(f"  relevant   : {v.relevant:.2f}   (Noul: P(on-topic))")
+    print(f"  is_noise   : {v.is_noise:.2f}   (Noul: P(cosmetic))")
+    passed = v.passes(settings.severity_conf_min, settings.relevant_prob_min,
+                      settings.noise_prob_max)
+    print(f"  -> passes the gate: {passed}")
+    print("=" * 54)
+
+
 def _report(survivors: list[ScoredChunk]):
     print(f"\n{'='*54}\nJev kept {len(survivors)} survivor(s) after the gate:")
     for s in survivors:
@@ -75,10 +101,15 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--mock", action="store_true",
                     help="run with a canned diff and mock Jev, no network")
+    ap.add_argument("--jev-test", action="store_true",
+                    help="send one hard-coded chunk to the REAL Jev API only")
     args = ap.parse_args()
 
-    has_keys = settings.firecrawl_api_key and settings.jev_api_key
-    if args.mock or not has_keys:
+    if args.jev_test:
+        if not settings.jev_api_key:
+            raise SystemExit("--jev-test needs JEV_API_KEY set in .env")
+        asyncio.run(jev_test_run())
+    elif args.mock or not (settings.firecrawl_api_key and settings.jev_api_key):
         asyncio.run(mock_run())
     else:
         asyncio.run(real_run())
