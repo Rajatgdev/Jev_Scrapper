@@ -1,0 +1,20 @@
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; }
+.wrap { max-width: 720px; margin: 0 auto; padding: 2rem 1.25rem; }
+h1 { margin: 0; font-size: 2rem; letter-spacing: -0.02em; }
+.sub { color: #666; margin-top: 0.25rem; }
+h2 { font-size: 1.1rem; margin-top: 2rem; }
+ul { padding-left: 1.1rem; }
+li { margin: 0.3rem 0; }
+.url { color: #777; font-size: 0.9rem; }
+button {
+  margin-top: 1.5rem; padding: 0.7rem 1.4rem; font-size: 1rem;
+  border: 0; border-radius: 8px; background: #0f3460; color: #fff; cursor: pointer;
+}
+button:disabled { opacity: 0.6; cursor: default; }
+.err { color: #b00020; }
+.result pre {
+  background: rgba(127,127,127,0.12); padding: 1rem; border-radius: 8px;
+  white-space: pre-wrap; line-height: 1.5;
+}
