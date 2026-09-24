@@ -25,7 +25,7 @@ async def run_for_url(url: str, title: str) -> list[ScoredChunk]:
         if s.verdict.passes(
             settings.severity_conf_min,
             settings.relevant_conf_min,
-            settings.noise_conf_min,
+            settings.noise_prob_max,
         )
     ]
 

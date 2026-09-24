@@ -47,16 +47,16 @@ async def mock_run():
     # Mock Jev verdicts so the skeleton runs with zero keys. The REAL jev.evaluate
     # sends these same three typed questions to Jev.
     mock_verdicts = [
-        Verdict(severity="high", severity_conf=0.91, relevant=True,
-                relevant_conf=0.88, is_noise=False, is_noise_conf=0.05),
-        Verdict(severity="low", severity_conf=0.80, relevant=False,
-                relevant_conf=0.72, is_noise=True, is_noise_conf=0.94),
+        Verdict(severity="high", severity_conf=0.91, relevant=0.88,
+                is_noise=0.05),
+        Verdict(severity="low", severity_conf=0.80, relevant=0.72,
+                is_noise=0.94),
     ]
     scored = [ScoredChunk(chunk=c, verdict=v)
               for c, v in zip(chunks, mock_verdicts)]
     survivors = [s for s in scored if s.verdict.passes(
         settings.severity_conf_min, settings.relevant_conf_min,
-        settings.noise_conf_min)]
+        settings.noise_prob_max)]
     _report(survivors)
 
 
@@ -64,8 +64,8 @@ def _report(survivors: list[ScoredChunk]):
     print(f"\n{'='*54}\nJev kept {len(survivors)} survivor(s) after the gate:")
     for s in survivors:
         v = s.verdict
-        print(f"  [{v.severity} {v.severity_conf:.2f} | relevant={v.relevant} "
-              f"{v.relevant_conf:.2f}]  {s.chunk.new_text!r}")
+        print(f"  [{v.severity} {v.severity_conf:.2f} | "
+              f"relevant={v.relevant:.2f}]  {s.chunk.new_text!r}")
     if not survivors:
         print("  (nothing high + relevant — no email would be sent)")
     print("="*54)

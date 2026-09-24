@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     # jev
     jev_api_key: str = ""
-    jev_model: str = "jev"
+    jev_model: str = "jev-latest"
 
     # openai
     openai_api_key: str = ""
@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # thresholds
     severity_conf_min: float = 0.60
     relevant_conf_min: float = 0.60
-    noise_conf_min: float = 0.70
+    noise_prob_max: float = 0.70
 
     # the editable policy sentence
     topic_question: str = "Is this change about customs rules affecting chemical products?"

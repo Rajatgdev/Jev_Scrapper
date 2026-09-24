@@ -12,23 +12,29 @@ class Chunk(BaseModel):
 
 
 class Verdict(BaseModel):
-    """Jev's typed answer for one chunk."""
-    severity: str          # "high" | "medium" | "low"
-    severity_conf: float
-    relevant: bool
-    relevant_conf: float
-    is_noise: bool = False
-    is_noise_conf: float = 0.0
+    """Jev's typed answer for one chunk.
 
-    def passes(self, sev_min: float, rel_min: float, noise_min: float) -> bool:
-        """The gate. Plain code, not the model, decides what survives."""
-        if self.is_noise and self.is_noise_conf >= noise_min:
+    severity is a Choice (option + confidence, both from the distribution).
+    relevant and is_noise are Nouls: a single probability of yes, 0..1, with
+    NO separate confidence — the probability is the whole signal.
+    """
+    severity: str          # "high" | "medium" | "low"
+    severity_conf: float   # Choice confidence, from the distribution
+    relevant: float        # Noul: P(change is on-topic)
+    is_noise: float        # Noul: P(change is purely cosmetic)
+
+    def passes(self, sev_min: float, rel_min: float, noise_max: float) -> bool:
+        """The gate. Plain code, not the model, decides what survives.
+
+        A Noul is thresholded directly (docs: `noul > threshold`). A high
+        is_noise probability drops the chunk; relevant must clear rel_min.
+        """
+        if self.is_noise >= noise_max:
             return False
         return (
             self.severity == "high"
             and self.severity_conf >= sev_min
-            and self.relevant
-            and self.relevant_conf >= rel_min
+            and self.relevant >= rel_min
         )
 
 

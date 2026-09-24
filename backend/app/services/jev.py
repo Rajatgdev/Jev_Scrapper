@@ -1,52 +1,65 @@
 """THE CORE. One Jev evaluation per changed chunk.
 
 Jev is not an LLM. It takes state (the old + new paragraph) plus typed questions
-and returns typed answers with confidence — a Choice for severity, Booleans for
-relevance and noise. It generates no prose. This is the many-calls, fast, cheap
-job the whole project is built around.
+and returns typed answers — a Choice for severity, Nouls for relevance and noise.
+It generates no prose. This is the many-calls, fast, cheap job the whole project
+is built around.
 
-The exact request shape depends on the Jev SDK/endpoint you use (direct API vs
-Composio MCP). The HTTP call below is written against a typed-evaluation endpoint
-that takes a shared `state` and named questions; adjust field names to match the
-Jev API you connect to. The CONTRACT — three named questions, typed answers with
-confidence — is what matters and stays fixed.
+Contract (docs.typesafe.ai/api):
+  POST https://api.typesafe.ai/v1/systemone
+  body: { state, model, questions{ id: {type, instructions, criteria?} } }
+  Choice question -> answer has .choice + .confidence
+  Noul question   -> answer has .noul (0..1), NO separate confidence
 """
 import httpx
 from app.core.config import settings
 from app.models.schemas import Chunk, Verdict
 
-JEV_URL = "https://api.typesafe.ai/v1/evaluate"  # adjust to your Jev endpoint
+JEV_URL = "https://api.typesafe.ai/v1/systemone"
 
-SEVERITY_Q = (
+SEVERITY_INSTRUCTIONS = (
     "Rate how significant this change is to someone tracking regulatory "
-    "obligations. high = a rule, rate, threshold, deadline or scope changed. "
-    "medium = substantive new content, impact unclear. low = cosmetic, "
-    "navigational, or boilerplate."
+    "obligations."
 )
-NOISE_Q = (
+SEVERITY_CRITERIA = {
+    "high": "A rule, rate, threshold, deadline or scope changed.",
+    "medium": "Substantive new content, impact unclear.",
+    "low": "Cosmetic, navigational, or boilerplate.",
+}
+NOISE_INSTRUCTIONS = (
     "Is this change purely cosmetic (footer, date stamp, link order, cookie "
     "notice) with no change in meaning?"
 )
 
 
-def _state(chunk: Chunk) -> str:
-    return (
-        f"Page: {chunk.page_title} ({chunk.page_url})\n"
-        f"OLD:\n{chunk.old_text}\n\n"
-        f"NEW:\n{chunk.new_text}"
-    )
+def _state(chunk: Chunk) -> dict:
+    return {
+        "page_title": chunk.page_title,
+        "page_url": chunk.page_url,
+        "old_text": chunk.old_text,
+        "new_text": chunk.new_text,
+    }
 
 
 async def evaluate(chunk: Chunk) -> Verdict:
     """Send one shared state + three typed questions in a single call."""
     payload = {
-        "model": settings.jev_model,
         "state": _state(chunk),
+        "model": settings.jev_model,
         "questions": {
-            "severity": {"type": "choice", "options": ["high", "medium", "low"],
-                         "question": SEVERITY_Q},
-            "relevant": {"type": "boolean", "question": settings.topic_question},
-            "is_noise": {"type": "boolean", "question": NOISE_Q},
+            "severity": {
+                "type": "choice",
+                "instructions": SEVERITY_INSTRUCTIONS,
+                "criteria": SEVERITY_CRITERIA,
+            },
+            "relevant": {
+                "type": "noul",
+                "instructions": settings.topic_question,
+            },
+            "is_noise": {
+                "type": "noul",
+                "instructions": NOISE_INSTRUCTIONS,
+            },
         },
     }
     headers = {"Authorization": f"Bearer {settings.jev_api_key}"}
@@ -57,10 +70,8 @@ async def evaluate(chunk: Chunk) -> Verdict:
         ans = r.json()["answers"]
 
     return Verdict(
-        severity=ans["severity"]["value"],
+        severity=ans["severity"]["choice"],
         severity_conf=ans["severity"]["confidence"],
-        relevant=ans["relevant"]["value"],
-        relevant_conf=ans["relevant"]["confidence"],
-        is_noise=ans["is_noise"]["value"],
-        is_noise_conf=ans["is_noise"]["confidence"],
+        relevant=ans["relevant"]["noul"],
+        is_noise=ans["is_noise"]["noul"],
     )
