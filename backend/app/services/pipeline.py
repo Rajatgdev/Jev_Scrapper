@@ -3,7 +3,7 @@ in Jev (per chunk) and OpenAI (once)."""
 import asyncio
 from app.core.config import settings
 from app.models.schemas import ScoredChunk
-from app.services import scraper, differ, jev, summariser
+from app.services import scraper, differ, jev, summariser, emailer
 
 
 async def run_for_url(url: str, title: str) -> list[ScoredChunk]:
@@ -37,6 +37,8 @@ async def run_daily(targets: list[dict]) -> dict:
         all_survivors.extend(await run_for_url(t["url"], t["title"]))
 
     digest = await summariser.summarise(all_survivors)  # skips call if empty
+    if settings.send_email:
+        await emailer.send_digest(digest, len(all_survivors))
     return {
         "digest": digest,
         "survivor_count": len(all_survivors),

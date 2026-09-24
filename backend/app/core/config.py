@@ -25,11 +25,10 @@ class Settings(BaseSettings):
     # the editable policy sentence
     topic_question: str = "Is this change about customs rules affecting chemical products?"
 
-    # email
-    smtp_host: str = ""
-    smtp_port: int = 587
-    smtp_user: str = ""
-    smtp_pass: str = ""
+    # email (Resend)
+    send_email: bool = False
+    resend_api_key: str = ""
+    digest_from: str = ""
     digest_to: str = ""
 
     # cors
