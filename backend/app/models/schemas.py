@@ -9,6 +9,7 @@ class Chunk(BaseModel):
     page_url: str
     old_text: str
     new_text: str
+    question: str          # per-target relevance question for Jev
 
 
 class Verdict(BaseModel):

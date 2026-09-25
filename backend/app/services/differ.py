@@ -10,7 +10,8 @@ is a simple, good-enough v1 pairing; refine later if a source needs it.
 from app.models.schemas import Chunk
 
 
-def chunks_from_diff(diff_text: str, page_title: str, page_url: str) -> list[Chunk]:
+def chunks_from_diff(diff_text: str, page_title: str, page_url: str,
+                     question: str) -> list[Chunk]:
     chunks: list[Chunk] = []
     removed: list[str] = []
     added: list[str] = []
@@ -21,7 +22,7 @@ def chunks_from_diff(diff_text: str, page_title: str, page_url: str) -> list[Chu
         if old or new:
             chunks.append(Chunk(
                 page_title=page_title, page_url=page_url,
-                old_text=old, new_text=new,
+                old_text=old, new_text=new, question=question,
             ))
         removed.clear()
         added.clear()

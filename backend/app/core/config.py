@@ -22,8 +22,7 @@ class Settings(BaseSettings):
     relevant_prob_min: float = 0.60
     noise_prob_max: float = 0.70
 
-    # the editable policy sentence
-    topic_question: str = "Is this change about customs rules affecting chemical products?"
+
 
     # email (Resend)
     send_email: bool = False

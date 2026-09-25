@@ -54,7 +54,7 @@ async def evaluate(chunk: Chunk) -> Verdict:
             },
             "relevant": {
                 "type": "noul",
-                "instructions": settings.topic_question,
+                "instructions": chunk.question,
             },
             "is_noise": {
                 "type": "noul",

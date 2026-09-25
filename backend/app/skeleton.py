@@ -33,7 +33,7 @@ async def real_run():
     all_survivors = []
     for t in TARGETS:
         print(f"[real] scraping {t['url']}")
-        survivors = await pipeline.run_for_url(t["url"], t["title"])
+        survivors = await pipeline.run_for_url(t["url"], t["title"], t["question"])
         all_survivors.extend(survivors)
     _report(all_survivors)
 
@@ -41,7 +41,8 @@ async def real_run():
 async def mock_run():
     print("[mock] no network — using a canned diff\n")
     chunks = differ.chunks_from_diff(MOCK_DIFF, "Import controls: chemicals",
-                                     "https://example.gov/customs/chemicals")
+                                     "https://example.gov/customs/chemicals",
+                                     "Is this about customs rules for chemicals?")
     print(f"chunked into {len(chunks)} change(s):")
     for c in chunks:
         print(f"  - OLD: {c.old_text!r}\n    NEW: {c.new_text!r}")
@@ -71,6 +72,7 @@ async def jev_test_run():
         page_url="https://example.gov/customs/chemicals",
         old_text="Duty rate on listed substances: 0%",
         new_text="Duty rate on listed substances: 5%",
+        question="Is this change about customs rules affecting chemical products?",
     )
     print("[jev-test] sending one chunk to the real Jev API...")
     print(f"  OLD: {chunk.old_text!r}")

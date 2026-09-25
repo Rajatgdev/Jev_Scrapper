@@ -6,13 +6,13 @@ from app.models.schemas import ScoredChunk
 from app.services import scraper, differ, jev, summariser, emailer
 
 
-async def run_for_url(url: str, title: str) -> list[ScoredChunk]:
+async def run_for_url(url: str, title: str, question: str) -> list[ScoredChunk]:
     """Scrape -> diff -> chunk -> Jev per chunk -> threshold. Returns survivors."""
     status, diff = await scraper.scrape_with_diff(url)
     if status != "changed" or not diff:
         return []  # unchanged pages exit here, before any Jev call
 
-    chunks = differ.chunks_from_diff(diff, title, url)
+    chunks = differ.chunks_from_diff(diff, title, url, question)
 
     # THE CORE LOOP: one Jev decision per changed paragraph.
     verdicts = await asyncio.gather(*(jev.evaluate(c) for c in chunks))
@@ -34,7 +34,8 @@ async def run_daily(targets: list[dict]) -> dict:
     """Run every target, summarise survivors once, return the digest + detail."""
     all_survivors: list[ScoredChunk] = []
     for t in targets:
-        all_survivors.extend(await run_for_url(t["url"], t["title"]))
+        all_survivors.extend(
+            await run_for_url(t["url"], t["title"], t["question"]))
 
     digest = await summariser.summarise(all_survivors)  # skips call if empty
     if settings.send_email:

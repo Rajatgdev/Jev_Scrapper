@@ -1,56 +1,61 @@
-import { useState, useEffect } from "react";
-import { runMonitor, getTargets } from "./lib/api";
+import { useState } from "react";
+import { Routes, Route, NavLink, Navigate } from "react-router-dom";
+import { LayoutDashboard, ListChecks, FileText, PanelLeftClose, PanelLeft } from "lucide-react";
+import Dashboard from "./pages/Dashboard.jsx";
+import Targets from "./pages/Targets.jsx";
+import Digest from "./pages/Digest.jsx";
+
+const NAV = [
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/targets", label: "Targets", icon: ListChecks },
+  { to: "/digest", label: "Digest", icon: FileText },
+];
 
 export default function App() {
-  const [targets, setTargets] = useState([]);
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    getTargets().then(setTargets).catch((e) => setError(e.message));
-  }, []);
-
-  async function onRun() {
-    setLoading(true);
-    setError(null);
-    try {
-      setResult(await runMonitor());
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [collapsed, setCollapsed] = useState(false);
+  const [lastRun, setLastRun] = useState(null);
 
   return (
-    <main className="wrap">
-      <h1>Sentinel</h1>
-      <p className="sub">Jev-driven website change monitor</p>
+    <div className="shell">
+      <aside className={`rail${collapsed ? " collapsed" : ""}`}>
+        <div className="rail-head">
+          <span className="mark-dot" />
+          <span className="mark">Sentinel</span>
+          <button
+            className="rail-toggle"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
+          >
+            {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
+          </button>
+        </div>
 
-      <section>
-        <h2>Watching {targets.length} page(s)</h2>
-        <ul>
-          {targets.map((t) => (
-            <li key={t.url}>
-              <strong>{t.title}</strong> — <span className="url">{t.url}</span>
-            </li>
+        <nav className="nav">
+          {NAV.map(({ to, label, icon: Icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
+              title={collapsed ? label : undefined}
+            >
+              <Icon size={18} />
+              <span className="nav-label">{label}</span>
+            </NavLink>
           ))}
-        </ul>
-      </section>
+        </nav>
 
-      <button onClick={onRun} disabled={loading}>
-        {loading ? "Running…" : "Run monitor now"}
-      </button>
+        <div className="rail-foot">Changes classified by Jev</div>
+      </aside>
 
-      {error && <p className="err">Error: {error}</p>}
-
-      {result && (
-        <section className="result">
-          <h2>Digest ({result.survivor_count} significant change(s))</h2>
-          <pre>{result.digest}</pre>
-        </section>
-      )}
-    </main>
+      <main className="main">
+        <Routes>
+          <Route path="/" element={<Dashboard lastRun={lastRun} setLastRun={setLastRun} />} />
+          <Route path="/targets" element={<Targets />} />
+          <Route path="/digest" element={<Digest lastRun={lastRun} />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+    </div>
   );
 }
