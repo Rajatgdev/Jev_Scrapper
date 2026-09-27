@@ -25,15 +25,20 @@ def _html(digest: str) -> str:
     )
 
 
-async def send_digest(digest: str, survivor_count: int) -> bool:
+async def send_digest(digest: str, survivor_count: int,
+                      to: str | None = None) -> bool:
     """Send the digest email. Returns True on success.
+
+    `to` is the recipient; defaults to settings.digest_to for the single-user
+    manual path. The scheduler passes each user's own email.
 
     Caller decides whether to send; this just sends. Fails loud if the
     config is incomplete, so a misconfigured run doesn't silently skip.
     """
-    if not (settings.resend_api_key and settings.digest_to and settings.digest_from):
+    recipient = to or settings.digest_to
+    if not (settings.resend_api_key and recipient and settings.digest_from):
         raise RuntimeError(
-            "Email not configured: set RESEND_API_KEY, DIGEST_FROM, DIGEST_TO"
+            "Email not configured: set RESEND_API_KEY, DIGEST_FROM, and a recipient"
         )
 
     subject = (
@@ -42,7 +47,7 @@ async def send_digest(digest: str, survivor_count: int) -> bool:
     )
     payload = {
         "from": settings.digest_from,
-        "to": [settings.digest_to],
+        "to": [recipient],
         "subject": subject,
         "html": _html(digest),
     }

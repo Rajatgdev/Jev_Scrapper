@@ -230,3 +230,47 @@ The moment this is multi-user, that is a real hole — anyone could run anyone's
 monitor or read/alter links. **Auth (step B) is what closes it, so B is not
 optional polish; it's a security requirement before real users touch this.**
 Until B ships, keep the deployed app's URL unshared.
+
+
+
+
+## Scheduler: Option A (current) vs Option B (later)
+
+The scheduler is a **second Railway service** off the same repo, cron entry at
+`app/jobs/run_all.py`, schedule set in that service's dashboard (Settings → Cron
+Schedule). It calls the pipeline directly — no HTTP, no auth cookie — and must
+run to completion and exit (it disposes the DB engine) or Railway skips the next
+run. Railway crons are UTC and minimum every 5 minutes.
+
+### Option A — run everyone on a fixed cadence (BUILT)
+
+The cron fires (e.g. `0 */6 * * *`, every 6 hours) and runs **all** active users
+with active links, emailing each their own digest. `run_hour`/`timezone` are
+ignored. This is correct for a frequent cadence, where "each user picks an hour"
+is meaningless. `run_all.py` loops `store.all_active_users_with_links()` and calls
+`pipeline.run_for_user(links, email)` per user; one user's failure is caught so
+the rest still run.
+
+### Option B — honor per-user run_hour (SWITCH TO AT DAILY CADENCE)
+
+When we move to once-a-day, per-user timing becomes meaningful. Change:
+
+1. **Cron cadence → hourly** (`0 * * * *`), because we now decide per-user each
+   hour whether they are due.
+2. **Filter to due users.** In `run_all.py`, instead of running every user, run
+   only those whose local hour now equals their `run_hour`:
+   - current UTC hour is known from `datetime.now(timezone.utc)`.
+   - for each user, convert now to their `timezone` (zoneinfo) and compare the
+     resulting hour to `run_hour`.
+   - Postgres can do this in the query with `AT TIME ZONE`, e.g. select users
+     where `extract(hour from (now() AT TIME ZONE u.timezone)) = u.run_hour`, so
+     the hourly cron only pulls the due users and runs them. This keeps the
+     per-user selection in SQL rather than looping all users in Python.
+3. **A Settings page** in the frontend so users can set `run_hour` + `timezone`
+   (schema already has both columns; nothing there is wired to the UI yet).
+4. Everything downstream (`run_for_user`, emailing each user) is unchanged — only
+   *which* users run each tick changes.
+
+Guard when switching: an hourly cron that mis-selects could run a user 24×/day
+(24× the credits/emails). Test the timezone selection against a couple of known
+users before trusting it.

@@ -79,3 +79,25 @@ async def record_run(digest: str, survivor_count: int, trigger: str = "manual",
                  "VALUES (:u, now(), :c, :d, 'ok', :trg)"),
             {"u": user_id, "c": survivor_count, "d": digest, "trg": trigger})
         await s.commit()
+
+
+async def all_active_users_with_links() -> list[dict]:
+    """Every active user and their active links. For the scheduler.
+
+    Returns [{id, email, links: [{title, url, question}, ...]}, ...],
+    skipping users who have no active links (nothing to run).
+    """
+    async with SessionLocal() as s:
+        rows = await s.execute(
+            text("SELECT u.id, u.email, l.title, l.url, l.question "
+                 "FROM users u JOIN links l ON l.user_id = u.id "
+                 "WHERE u.is_active AND l.is_active "
+                 "ORDER BY u.id"))
+        users: dict[int, dict] = {}
+        for r in rows:
+            m = r._mapping
+            u = users.setdefault(m["id"], {"id": m["id"], "email": m["email"],
+                                           "links": []})
+            u["links"].append({"title": m["title"], "url": m["url"],
+                               "question": m["question"]})
+        return list(users.values())

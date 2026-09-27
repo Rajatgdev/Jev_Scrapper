@@ -1,5 +1,10 @@
-"""The daily flow, wired end to end. Plain orchestration — the intelligence is
-in Jev (per chunk) and OpenAI (once)."""
+"""The monitoring flow, wired end to end. Plain orchestration — the intelligence
+is in Jev (per chunk) and OpenAI (once per run).
+
+run_for_url    : one page -> survivors (the core loop)
+run_for_user   : all of ONE user's links -> digest, emailed to THAT user
+run_daily      : the manual /api/run path for a given target list
+"""
 import asyncio
 from app.core.config import settings
 from app.models.schemas import ScoredChunk
@@ -30,18 +35,39 @@ async def run_for_url(url: str, title: str, question: str) -> list[ScoredChunk]:
     ]
 
 
-async def run_daily(targets: list[dict]) -> dict:
-    """Run every target, summarise survivors once, return the digest + detail."""
+async def _run_targets(targets: list[dict]) -> tuple[str, list[ScoredChunk]]:
+    """Run a list of targets, summarise once. Returns (digest, survivors)."""
     all_survivors: list[ScoredChunk] = []
     for t in targets:
         all_survivors.extend(
             await run_for_url(t["url"], t["title"], t["question"]))
-
     digest = await summariser.summarise(all_survivors)  # skips call if empty
-    if settings.send_email:
-        await emailer.send_digest(digest, len(all_survivors))
+    return digest, all_survivors
+
+
+async def run_for_user(targets: list[dict], email: str) -> dict:
+    """Run ONE user's targets and email the digest to THAT user.
+
+    Used by the scheduler. Emails only when there's something to report, so a
+    quiet run doesn't spend on email or nag the user.
+    """
+    digest, survivors = await _run_targets(targets)
+    if settings.send_email and survivors:
+        await emailer.send_digest(digest, len(survivors), to=email)
     return {
         "digest": digest,
-        "survivor_count": len(all_survivors),
-        "survivors": [s.model_dump() for s in all_survivors],
+        "survivor_count": len(survivors),
+        "survivors": [s.model_dump() for s in survivors],
+    }
+
+
+async def run_daily(targets: list[dict]) -> dict:
+    """Manual /api/run path: run targets, email the configured recipient."""
+    digest, survivors = await _run_targets(targets)
+    if settings.send_email:
+        await emailer.send_digest(digest, len(survivors))
+    return {
+        "digest": digest,
+        "survivor_count": len(survivors),
+        "survivors": [s.model_dump() for s in survivors],
     }
