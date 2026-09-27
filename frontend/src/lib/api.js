@@ -19,8 +19,8 @@ async function req(path, opts = {}) {
 export const getTargets = () => req("/api/targets");
 export const addTarget = (t) =>
   req("/api/targets", { method: "POST", body: JSON.stringify(t) });
-export const updateTarget = (index, t) =>
-  req(`/api/targets/${index}`, { method: "PUT", body: JSON.stringify(t) });
-export const deleteTarget = (index) =>
-  req(`/api/targets/${index}`, { method: "DELETE" });
+export const updateTarget = (id, t) =>
+  req(`/api/targets/${id}`, { method: "PUT", body: JSON.stringify(t) });
+export const deleteTarget = (id) =>
+  req(`/api/targets/${id}`, { method: "DELETE" });
 export const runMonitor = () => req("/api/run", { method: "POST" });

@@ -3,8 +3,10 @@ Start command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from app.core.config import settings
 from app.routers import monitor
+from app.db.session import SessionLocal
 
 app = FastAPI(title="Sentinel", version="1.0")
 
@@ -20,5 +22,13 @@ app.include_router(monitor.router)
 
 
 @app.get("/health")
-def health():
-    return {"status": "ok"}
+async def health():
+    """Reports app health and whether the database is reachable."""
+    db_ok = False
+    try:
+        async with SessionLocal() as s:
+            await s.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        db_ok = False
+    return {"status": "ok", "database": "connected" if db_ok else "unreachable"}

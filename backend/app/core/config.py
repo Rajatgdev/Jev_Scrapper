@@ -33,9 +33,9 @@ class Settings(BaseSettings):
     # cors
     allowed_origins: str = "http://localhost:5173"
 
-    # db (off by default)
-    use_db: bool = False
-    database_url: str = ""
+    # db — Neon Postgres. POOLED url (app) + DIRECT url (migrations).
+    database_url: str = ""          # postgresql+asyncpg://…-pooler…/db  (app queries)
+    database_url_direct: str = ""   # postgresql://…/db                 (migrations only)
 
     @property
     def origins_list(self) -> list[str]:

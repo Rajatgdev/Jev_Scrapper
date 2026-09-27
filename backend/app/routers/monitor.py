@@ -1,19 +1,16 @@
-"""API the frontend calls: run the monitor, and CRUD the watched targets.
+"""API the frontend calls: run the monitor, and CRUD the watched links.
 
-Targets are seeded from targets.py and held in memory for the session. Adds/
-edits/deletes from the UI last until restart/redeploy — full persistence
-arrives when targets move to the database. The relevance question is per-target.
+Links now live in Neon (see app/db/store.py), scoped to the seed user until
+auth (step B) supplies a real user. The run reads links from the DB, runs the
+pipeline, records the run, and returns the digest.
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.core.targets import TARGETS
-from app.services import pipeline
+
 from app.db import store
+from app.services import pipeline
 
 router = APIRouter(prefix="/api", tags=["monitor"])
-
-# In-memory working copy, seeded from the config file.
-_targets: list[dict] = [dict(t) for t in TARGETS]
 
 
 class TargetIn(BaseModel):
@@ -23,36 +20,39 @@ class TargetIn(BaseModel):
 
 
 @router.get("/targets")
-def list_targets():
-    return _targets
+async def list_targets():
+    return await store.list_links()
 
 
 @router.post("/targets")
-def add_target(t: TargetIn):
-    if any(x["url"] == t.url for x in _targets):
-        raise HTTPException(409, "A target with this URL already exists")
-    _targets.append(t.model_dump())
-    return t.model_dump()
+async def add_target(t: TargetIn):
+    try:
+        return await store.add_link(t.title, t.url, t.question)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
 
 
-@router.put("/targets/{index}")
-def update_target(index: int, t: TargetIn):
-    if not 0 <= index < len(_targets):
+@router.put("/targets/{link_id}")
+async def update_target(link_id: int, t: TargetIn):
+    updated = await store.update_link(link_id, t.title, t.url, t.question)
+    if updated is None:
         raise HTTPException(404, "Target not found")
-    _targets[index] = t.model_dump()
-    return t.model_dump()
+    return updated
 
 
-@router.delete("/targets/{index}")
-def delete_target(index: int):
-    if not 0 <= index < len(_targets):
+@router.delete("/targets/{link_id}")
+async def delete_target(link_id: int):
+    if not await store.delete_link(link_id):
         raise HTTPException(404, "Target not found")
-    return _targets.pop(index)
+    return {"deleted": link_id}
 
 
 @router.post("/run")
 async def run():
-    """Run the monitor over all current targets, return digest + survivors."""
-    result = await pipeline.run_daily(_targets)
-    store.save_run(result)  # no-op unless USE_DB=true
+    """Run the monitor over the user's links, record the run, return the digest."""
+    links = await store.list_links()
+    targets = [{"title": l["title"], "url": l["url"], "question": l["question"]}
+               for l in links if l["is_active"]]
+    result = await pipeline.run_daily(targets)
+    await store.record_run(result["digest"], result["survivor_count"], "manual")
     return result

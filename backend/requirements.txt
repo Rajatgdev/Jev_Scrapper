@@ -7,3 +7,5 @@ python-dotenv==1.0.1
 # Optional DB layer (only imported when USE_DB=true)
 sqlalchemy==2.0.36
 psycopg[binary]==3.2.3
+asyncpg==0.30.0
+greenlet==3.1.1

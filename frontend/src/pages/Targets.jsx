@@ -8,7 +8,7 @@ export default function Targets() {
   const [targets, setTargets] = useState(null);
   const [error, setError] = useState(null);
   const [adding, setAdding] = useState(false);
-  const [editIndex, setEditIndex] = useState(null);
+  const [editId, setEditId] = useState(null);
   const [draft, setDraft] = useState(BLANK);
 
   async function load() {
@@ -22,17 +22,17 @@ export default function Targets() {
 
   function startAdd() {
     setDraft(BLANK);
-    setEditIndex(null);
+    setEditId(null);
     setAdding(true);
   }
-  function startEdit(i) {
-    setDraft(targets[i]);
+  function startEdit(link) {
+    setDraft(link);
     setAdding(false);
-    setEditIndex(i);
+    setEditId(link.id);
   }
   function cancel() {
     setAdding(false);
-    setEditIndex(null);
+    setEditId(null);
     setDraft(BLANK);
     setError(null);
   }
@@ -40,7 +40,7 @@ export default function Targets() {
   async function save() {
     setError(null);
     try {
-      if (editIndex !== null) await updateTarget(editIndex, draft);
+      if (editId !== null) await updateTarget(editId, draft);
       else await addTarget(draft);
       cancel();
       load();
@@ -49,10 +49,10 @@ export default function Targets() {
     }
   }
 
-  async function remove(i) {
+  async function remove(id) {
     setError(null);
     try {
-      await deleteTarget(i);
+      await deleteTarget(id);
       load();
     } catch (e) {
       setError(e.message);
@@ -72,7 +72,7 @@ export default function Targets() {
 
       {error && <div className="banner banner-error">{error}</div>}
 
-      {(adding || editIndex !== null) && (
+      {(adding || editId !== null) && (
         <div className="form-card">
           <div className="field">
             <label>Name</label>
@@ -103,7 +103,7 @@ export default function Targets() {
           </div>
           <div className="form-actions">
             <button className="btn btn-primary btn-sm" onClick={save} disabled={!valid}>
-              <Check size={15} /> {editIndex !== null ? "Save changes" : "Add target"}
+              <Check size={15} /> {editId !== null ? "Save changes" : "Add target"}
             </button>
             <button className="btn btn-ghost btn-sm" onClick={cancel}>
               <X size={15} /> Cancel
@@ -112,7 +112,7 @@ export default function Targets() {
         </div>
       )}
 
-      {!adding && editIndex === null && (
+      {!adding && editId === null && (
         <button className="btn btn-ghost" onClick={startAdd} style={{ marginBottom: 24 }}>
           <Plus size={16} /> Add a target
         </button>
@@ -127,8 +127,8 @@ export default function Targets() {
         </div>
       ) : (
         <div className="tlist">
-          {targets.map((t, i) => (
-            <div className="titem" key={t.url + i}>
+          {targets.map((t) => (
+            <div className="titem" key={t.id}>
               <div className="titem-body">
                 <p className="titem-title">{t.title}</p>
                 <p className="titem-url">{t.url}</p>
@@ -138,10 +138,10 @@ export default function Targets() {
                 </div>
               </div>
               <div className="titem-actions">
-                <button className="icon-btn" onClick={() => startEdit(i)} aria-label="Edit">
+                <button className="icon-btn" onClick={() => startEdit(t)} aria-label="Edit">
                   <Pencil size={16} />
                 </button>
-                <button className="icon-btn danger" onClick={() => remove(i)} aria-label="Delete">
+                <button className="icon-btn danger" onClick={() => remove(t.id)} aria-label="Delete">
                   <Trash2 size={16} />
                 </button>
               </div>
