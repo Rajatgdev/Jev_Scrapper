@@ -1,7 +1,8 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-
+// Same-origin: Vercel proxies /api/* to the Railway backend, so we use relative
+// paths and send the session cookie with every request.
 async function req(path, opts = {}) {
-  const r = await fetch(`${API_URL}${path}`, {
+  const r = await fetch(path, {
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     ...opts,
   });
@@ -11,11 +12,22 @@ async function req(path, opts = {}) {
       const body = await r.json();
       if (body.detail) msg = body.detail;
     } catch {}
-    throw new Error(msg);
+    const err = new Error(msg);
+    err.status = r.status;
+    throw err;
   }
   return r.json();
 }
 
+// auth
+export const signup = (email, password) =>
+  req("/api/auth/signup", { method: "POST", body: JSON.stringify({ email, password }) });
+export const login = (email, password) =>
+  req("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+export const logout = () => req("/api/auth/logout", { method: "POST" });
+export const getMe = () => req("/api/auth/me");
+
+// targets
 export const getTargets = () => req("/api/targets");
 export const addTarget = (t) =>
   req("/api/targets", { method: "POST", body: JSON.stringify(t) });

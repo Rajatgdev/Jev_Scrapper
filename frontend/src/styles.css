@@ -245,3 +245,36 @@ a { color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation-duration: .01ms !important; }
 }
+
+/* ---------- auth ---------- */
+.boot {
+  display: flex; align-items: center; justify-content: center;
+  height: 100vh; color: var(--faint); font-size: 15px;
+}
+.auth-screen {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; padding: 24px; background: var(--paper);
+}
+.auth-card {
+  width: 100%; max-width: 400px; background: var(--panel);
+  border: 1px solid var(--hair); border-radius: 16px;
+  padding: 36px 34px;
+}
+.auth-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+.auth-title {
+  font-family: var(--serif); font-size: 26px; font-weight: 500;
+  letter-spacing: -0.015em; margin: 0 0 4px;
+}
+.auth-sub { color: var(--slate); font-size: 14px; margin: 0 0 24px; }
+.auth-submit { width: 100%; justify-content: center; margin-top: 4px; }
+.auth-switch { font-size: 14px; color: var(--slate); margin: 20px 0 0; text-align: center; }
+.linklike {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--accent); font: inherit; text-decoration: underline;
+}
+.signout {
+  width: 100%; background: none; border: none; cursor: pointer;
+  font: inherit; text-align: left; color: var(--slate);
+}
+.signout:hover { background: var(--hair-soft); color: var(--ink); }
+.signout .nav-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

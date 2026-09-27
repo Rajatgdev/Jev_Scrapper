@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Routes, Route, NavLink, Navigate } from "react-router-dom";
-import { LayoutDashboard, ListChecks, FileText, PanelLeftClose, PanelLeft } from "lucide-react";
+import { LayoutDashboard, ListChecks, FileText, PanelLeftClose, PanelLeft, LogOut } from "lucide-react";
 import Dashboard from "./pages/Dashboard.jsx";
 import Targets from "./pages/Targets.jsx";
 import Digest from "./pages/Digest.jsx";
+import Login from "./pages/Login.jsx";
+import { useAuth } from "./lib/auth";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -12,8 +14,16 @@ const NAV = [
 ];
 
 export default function App() {
+  const { user, loading, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [lastRun, setLastRun] = useState(null);
+
+  if (loading) {
+    return <div className="boot">Loading…</div>;
+  }
+  if (!user) {
+    return <Login />;
+  }
 
   return (
     <div className="shell">
@@ -45,7 +55,12 @@ export default function App() {
           ))}
         </nav>
 
-        <div className="rail-foot">Changes classified by Jev</div>
+        <div className="rail-foot">
+          <button className="nav-item signout" onClick={logout} title={collapsed ? "Sign out" : undefined}>
+            <LogOut size={18} />
+            <span className="nav-label">{user.email}</span>
+          </button>
+        </div>
       </aside>
 
       <main className="main">
