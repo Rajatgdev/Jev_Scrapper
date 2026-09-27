@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from app.core.config import settings
 from app.routers import monitor
+from app.auth.router import router as auth_router
 from app.db.session import SessionLocal
 
 app = FastAPI(title="Sentinel", version="1.0")
@@ -18,6 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(monitor.router)
 
 
