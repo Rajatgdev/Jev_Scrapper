@@ -10,7 +10,14 @@ async function req(path, opts = {}) {
     let msg = `${r.status}`;
     try {
       const body = await r.json();
-      if (body.detail) msg = body.detail;
+      if (typeof body.detail === "string") {
+        msg = body.detail;
+      } else if (Array.isArray(body.detail)) {
+        // FastAPI validation errors: array of {msg, loc, ...}
+        msg = body.detail.map((d) => d.msg || JSON.stringify(d)).join("; ");
+      } else if (body.detail) {
+        msg = JSON.stringify(body.detail);
+      }
     } catch {}
     const err = new Error(msg);
     err.status = r.status;
