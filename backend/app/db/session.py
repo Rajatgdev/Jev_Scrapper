@@ -10,15 +10,23 @@ from app.core.config import settings
 
 
 def _async_url(url: str) -> str:
-    """Neon hands out plain postgresql:// URLs; the async engine needs the
-    asyncpg driver. Normalize so either form pasted into .env works."""
-    if url.startswith("postgresql+asyncpg://"):
-        return url
-    if url.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+asyncpg://", 1)
-    return url
+    """Neon hands out plain postgresql:// URLs with a libpq ?sslmode= param.
+    The async engine needs the asyncpg driver, and asyncpg doesn't understand
+    sslmode in the URL — so normalize the scheme and strip sslmode (asyncpg
+    still negotiates SSL with Neon automatically)."""
+    from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+
+    for old, new in (("postgresql+asyncpg://", "postgresql+asyncpg://"),
+                     ("postgresql://", "postgresql+asyncpg://"),
+                     ("postgres://", "postgresql+asyncpg://")):
+        if url.startswith(old):
+            url = url.replace(old, new, 1)
+            break
+
+    parts = urlsplit(url)
+    query = [(k, v) for k, v in parse_qsl(parts.query) if k != "sslmode"]
+    return urlunsplit((parts.scheme, parts.netloc, parts.path,
+                       urlencode(query), parts.fragment))
 
 
 engine = create_async_engine(
