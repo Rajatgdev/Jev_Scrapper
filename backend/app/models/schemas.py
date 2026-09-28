@@ -29,11 +29,13 @@ class Verdict(BaseModel):
 
         A Noul is thresholded directly (docs: `noul > threshold`). A high
         is_noise probability drops the chunk; relevant must clear rel_min.
+        Keeps high AND medium severity — medium catches genuinely new content
+        of uncertain impact, which is worth surfacing for a monitor.
         """
         if self.is_noise >= noise_max:
             return False
         return (
-            self.severity == "high"
+            self.severity in ("high", "medium")
             and self.severity_conf >= sev_min
             and self.relevant >= rel_min
         )
