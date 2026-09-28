@@ -53,4 +53,7 @@ async def scrape_with_diff(url: str) -> tuple[str, str | None]:
           + (f" WARNING={warning}" if warning else ""))
 
     diff = (ct.get("diff") or {}).get("text") if status == "changed" else None
+    if status == "changed":
+        print(f"    [scraper]   diff present={diff is not None} "
+              f"diff_chars={len(diff) if diff else 0}")
     return status, diff

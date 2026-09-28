@@ -18,11 +18,19 @@ async def run_for_url(url: str, title: str, question: str) -> list[ScoredChunk]:
         return []  # unchanged pages exit here, before any Jev call
 
     chunks = differ.chunks_from_diff(diff, title, url, question)
+    print(f"    [pipeline] {url}: {len(chunks)} chunk(s) from diff")
 
     # THE CORE LOOP: one Jev decision per changed paragraph.
     verdicts = await asyncio.gather(*(jev.evaluate(c) for c in chunks))
 
     scored = [ScoredChunk(chunk=c, verdict=v) for c, v in zip(chunks, verdicts)]
+
+    for s in scored:
+        v = s.verdict
+        print(f"    [pipeline]   verdict: severity={v.severity} "
+              f"sev_conf={v.severity_conf:.2f} relevant={v.relevant:.2f} "
+              f"is_noise={v.is_noise:.2f} -> "
+              f"{'KEEP' if v.passes(settings.severity_conf_min, settings.relevant_prob_min, settings.noise_prob_max) else 'drop'}")
 
     # Gate in plain code, using thresholds from config.
     return [
