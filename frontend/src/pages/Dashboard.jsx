@@ -24,11 +24,11 @@ export default function Dashboard({ lastRun, setLastRun }) {
     }
   }
 
-  const flagged = lastRun && lastRun.survivor_count > 0;
+  const flagged = lastRun && lastRun.total > 0;
   const line = !lastRun
     ? "Ready when you are."
     : flagged
-    ? `${lastRun.survivor_count} significant ${lastRun.survivor_count === 1 ? "change" : "changes"} flagged.`
+    ? `${lastRun.total} significant ${lastRun.total === 1 ? "change" : "changes"} flagged.`
     : "All quiet.";
   const sub = !lastRun
     ? "Run the monitor to check your watched pages for changes."

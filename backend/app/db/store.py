@@ -69,16 +69,43 @@ async def delete_link(link_id: int, user_id: int = SEED_USER_ID) -> bool:
         return row.first() is not None
 
 
-async def record_run(digest: str, survivor_count: int, trigger: str = "manual",
+async def record_run(changes: list[dict], trigger: str = "manual",
                      user_id: int = SEED_USER_ID) -> None:
-    """Persist a completed run for history/audit."""
+    """Persist a completed run. `changes` is the grouped change list; we store
+    it as JSON in the digest column so the Digest page can render it."""
+    import json
     async with SessionLocal() as s:
         await s.execute(
             text("INSERT INTO runs (user_id, finished_at, survivor_count, "
                  "digest, status, trigger) "
                  "VALUES (:u, now(), :c, :d, 'ok', :trg)"),
-            {"u": user_id, "c": survivor_count, "d": digest, "trg": trigger})
+            {"u": user_id, "c": len(changes), "d": json.dumps(changes),
+             "trg": trigger})
         await s.commit()
+
+
+async def get_latest_run(user_id: int = SEED_USER_ID) -> dict | None:
+    """The user's most recent run: its changes (parsed) and when it finished."""
+    import json
+    async with SessionLocal() as s:
+        row = await s.execute(
+            text("SELECT digest, finished_at, survivor_count FROM runs "
+                 "WHERE user_id = :u AND status = 'ok' "
+                 "ORDER BY finished_at DESC LIMIT 1"),
+            {"u": user_id})
+        r = row.first()
+        if r is None:
+            return None
+        m = r._mapping
+        try:
+            changes = json.loads(m["digest"]) if m["digest"] else []
+        except (json.JSONDecodeError, TypeError):
+            changes = []
+        return {
+            "changes": changes,
+            "finished_at": m["finished_at"].isoformat() if m["finished_at"] else None,
+            "total": m["survivor_count"],
+        }
 
 
 async def all_active_users_with_links() -> list[dict]:

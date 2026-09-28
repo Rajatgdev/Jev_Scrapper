@@ -1,44 +1,40 @@
-"""The single OpenAI call per run. Runs only over chunks Jev already blessed as
-high-severity AND on-topic. If the survivor list is empty, it is NOT called.
+"""One OpenAI call per run: write a clean one-line summary for EACH kept change.
 
-Prose is the one thing Jev cannot do. Cost scales with real regulatory events,
-not with page churn.
+Input: the kept ScoredChunks (any severity). Output: a list of Change objects,
+one per chunk, each with a short human summary. Jev already labelled severity;
+OpenAI only writes prose. Returns [] for no input (no call made).
 """
+import json
 import httpx
 from app.core.config import settings
-from app.models.schemas import ScoredChunk
+from app.models.schemas import Change, ScoredChunk
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 
 SYSTEM = (
-    "You write concise regulatory-change briefings. You are given "
-    "pre-classified high-importance changes. Group by page, lead with the most "
-    "consequential, state plainly what changed from old to new. No speculation, "
-    "no filler."
+    "You summarise webpage changes for a monitoring digest. You are given a "
+    "JSON array of changes, each with an index, the page, and the old and new "
+    "text. For each, write ONE short, plain sentence saying what changed. No "
+    "preamble, no speculation. Respond with ONLY a JSON array of objects "
+    '{"index": <int>, "summary": "<one sentence>"}, same length and order as '
+    "the input. Return nothing but the JSON array."
 )
 
 
-async def summarise(survivors: list[ScoredChunk]) -> str:
+async def summarise(survivors: list[ScoredChunk]) -> list[Change]:
     if not survivors:
-        return "No significant changes today."
+        return []
 
     rows = [
-        {
-            "page": s.chunk.page_title,
-            "url": s.chunk.page_url,
-            "old": s.chunk.old_text,
-            "new": s.chunk.new_text,
-            "severity": s.verdict.severity,
-            "confidence": round(s.verdict.severity_conf, 2),
-        }
-        for s in survivors
+        {"index": i, "page": s.chunk.page_title,
+         "old": s.chunk.old_text[:500], "new": s.chunk.new_text[:500]}
+        for i, s in enumerate(survivors)
     ]
-
     payload = {
         "model": settings.openai_model,
         "messages": [
             {"role": "system", "content": SYSTEM},
-            {"role": "user", "content": str(rows)},
+            {"role": "user", "content": json.dumps(rows)},
         ],
     }
     headers = {"Authorization": f"Bearer {settings.openai_api_key}"}
@@ -46,4 +42,27 @@ async def summarise(survivors: list[ScoredChunk]) -> str:
     async with httpx.AsyncClient(timeout=60) as client:
         r = await client.post(OPENAI_URL, json=payload, headers=headers)
         r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"]
+        content = r.json()["choices"][0]["message"]["content"].strip()
+
+    # tolerate a ```json fence if the model adds one
+    if content.startswith("```"):
+        content = content.strip("`").lstrip("json").strip()
+
+    summaries: dict[int, str] = {}
+    try:
+        for item in json.loads(content):
+            summaries[int(item["index"])] = item["summary"]
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+        # fall back to the raw new text if the model misbehaves
+        summaries = {}
+
+    changes: list[Change] = []
+    for i, s in enumerate(survivors):
+        summary = summaries.get(i) or (s.chunk.new_text[:160] or "(content changed)")
+        changes.append(Change(
+            page_title=s.chunk.page_title,
+            page_url=s.chunk.page_url,
+            severity=s.verdict.severity,
+            summary=summary,
+        ))
+    return changes

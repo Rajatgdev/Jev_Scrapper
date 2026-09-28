@@ -48,11 +48,24 @@ async def delete_target(link_id: int, user: CurrentUser):
 
 @router.post("/run")
 async def run(user: CurrentUser):
-    """Run the monitor over the user's links, record the run, return the digest."""
+    """Run the monitor over the user's links, record the run, return changes."""
     links = await store.list_links(user["id"])
     targets = [{"title": l["title"], "url": l["url"], "question": l["question"]}
                for l in links if l["is_active"]]
     result = await pipeline.run_daily(targets)
-    await store.record_run(result["digest"], result["survivor_count"],
-                           "manual", user["id"])
+    await store.record_run(result["changes"], "manual", user["id"])
     return result
+
+
+@router.get("/digest")
+async def digest(user: CurrentUser):
+    """The user's latest run: changes grouped by severity, for the Digest page."""
+    latest = await store.get_latest_run(user["id"])
+    if latest is None:
+        return {"changes": [], "counts": {"high": 0, "medium": 0, "low": 0},
+                "total": 0, "finished_at": None}
+    changes = latest["changes"]
+    counts = {k: sum(c.get("severity") == k for c in changes)
+              for k in ("high", "medium", "low")}
+    return {"changes": changes, "counts": counts, "total": latest["total"],
+            "finished_at": latest["finished_at"]}

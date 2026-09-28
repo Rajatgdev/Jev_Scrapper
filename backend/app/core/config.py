@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     send_email: bool = False
     resend_api_key: str = ""
     digest_from: str = ""
+    app_url: str = "https://jev-scrapper.vercel.app" # for email links to the digest page
     digest_to: str = ""
 
     # cors

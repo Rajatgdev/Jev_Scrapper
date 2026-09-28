@@ -67,7 +67,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard lastRun={lastRun} setLastRun={setLastRun} />} />
           <Route path="/targets" element={<Targets />} />
-          <Route path="/digest" element={<Digest lastRun={lastRun} />} />
+          <Route path="/digest" element={<Digest />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

@@ -43,3 +43,4 @@ export const updateTarget = (id, t) =>
 export const deleteTarget = (id) =>
   req(`/api/targets/${id}`, { method: "DELETE" });
 export const runMonitor = () => req("/api/run", { method: "POST" });
+export const getDigest = () => req("/api/digest");

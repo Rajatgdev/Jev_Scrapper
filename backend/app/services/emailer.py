@@ -1,58 +1,83 @@
-"""Send the daily digest via Resend's HTTP API. Plain httpx, no SDK.
+"""Send the change digest via Resend. Shows all changes grouped High/Med/Low,
+each a one-line summary, with a button to open the full digest in the app.
 
-Contract (resend.com/docs/api-reference/emails):
-  POST https://api.resend.com/emails
-  headers: Authorization: Bearer re_...
-  body: { from, to: [..], subject, html }
+Contract: POST https://api.resend.com/emails, Bearer auth, {from,to,subject,html}.
 """
+import html as _html
 import httpx
 from app.core.config import settings
+from app.models.schemas import Change
 
 RESEND_URL = "https://api.resend.com/emails"
 
+SEV = {
+    "high":   ("High",   "#A6362E", "#F6E9E7"),
+    "medium": ("Medium", "#8A6D1F", "#F5EEDD"),
+    "low":    ("Low",    "#3F6B4C", "#E8F0E9"),
+}
 
-def _html(digest: str) -> str:
-    """Wrap the plain-text digest in minimal HTML (Resend wants html)."""
-    body = digest.replace("\n", "<br>")
+
+def _section(label: str, colour: str, bg: str, items: list[Change]) -> str:
+    if not items:
+        return ""
+    rows = "".join(
+        f'<div style="padding:10px 0;border-bottom:1px solid #eee">'
+        f'<div style="font-size:14px;color:#1c1c1a">{_html.escape(c.summary)}</div>'
+        f'<div style="font-size:12px;color:#8a8f98;margin-top:2px">'
+        f'{_html.escape(c.page_title)}</div></div>'
+        for c in items
+    )
     return (
-        "<div style=\"font-family:system-ui,sans-serif;max-width:640px;"
-        "line-height:1.5\">"
-        "<h2 style=\"color:#0f3460\">Sentinel — daily change digest</h2>"
-        f"<div>{body}</div>"
-        "<hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0\">"
-        "<p style=\"color:#777;font-size:13px\">Sent by Sentinel. "
-        "Changes classified by Jev.</p></div>"
+        f'<div style="margin:20px 0 8px">'
+        f'<span style="display:inline-block;font-size:12px;font-weight:600;'
+        f'color:{colour};background:{bg};padding:3px 10px;border-radius:20px">'
+        f'{label} · {len(items)}</span></div>{rows}'
     )
 
 
-async def send_digest(digest: str, survivor_count: int,
-                      to: str | None = None) -> bool:
-    """Send the digest email. Returns True on success.
+def _build_html(changes: list[Change], counts: dict) -> str:
+    buckets = {k: [c for c in changes if c.severity == k] for k in SEV}
+    sections = "".join(
+        _section(*SEV[k], buckets[k]) for k in ("high", "medium", "low")
+    )
+    digest_link = f"{settings.app_url.rstrip('/')}/digest"
+    return (
+        '<div style="font-family:system-ui,sans-serif;max-width:640px;'
+        'line-height:1.5;color:#1c1c1a">'
+        '<h2 style="font-family:Georgia,serif;color:#1b3a5b;font-weight:500">'
+        'Sentinel — change digest</h2>'
+        f'<p style="color:#5a5f6b;font-size:14px">'
+        f'{counts["high"]} high · {counts["medium"]} medium · {counts["low"]} low</p>'
+        f'{sections}'
+        f'<div style="margin-top:28px">'
+        f'<a href="{digest_link}" style="display:inline-block;background:#1b3a5b;'
+        f'color:#fff;text-decoration:none;font-size:14px;font-weight:500;'
+        f'padding:11px 20px;border-radius:9px">Open full digest</a></div>'
+        '<hr style="border:none;border-top:1px solid #ddd;margin:24px 0">'
+        '<p style="color:#777;font-size:13px">Sent by Sentinel. '
+        'Changes classified by Jev.</p></div>'
+    )
 
-    `to` is the recipient; defaults to settings.digest_to for the single-user
-    manual path. The scheduler passes each user's own email.
 
-    Caller decides whether to send; this just sends. Fails loud if the
-    config is incomplete, so a misconfigured run doesn't silently skip.
-    """
+async def send_digest(changes: list[Change], to: str | None = None) -> bool:
+    """Send the digest email listing all changes grouped by severity."""
     recipient = to or settings.digest_to
     if not (settings.resend_api_key and recipient and settings.digest_from):
         raise RuntimeError(
             "Email not configured: set RESEND_API_KEY, DIGEST_FROM, and a recipient"
         )
+    counts = {k: sum(c.severity == k for c in changes) for k in SEV}
+    total = len(changes)
+    subject = (f"Sentinel: {total} change(s) — "
+               f"{counts['high']} high, {counts['medium']} med, {counts['low']} low")
 
-    subject = (
-        f"Sentinel: {survivor_count} significant change(s)"
-        if survivor_count else "Sentinel: no significant changes today"
-    )
     payload = {
         "from": settings.digest_from,
         "to": [recipient],
         "subject": subject,
-        "html": _html(digest),
+        "html": _build_html(changes, counts),
     }
     headers = {"Authorization": f"Bearer {settings.resend_api_key}"}
-
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.post(RESEND_URL, json=payload, headers=headers)
         r.raise_for_status()
