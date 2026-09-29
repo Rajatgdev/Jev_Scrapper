@@ -57,10 +57,23 @@ export default function Digest() {
   async function onRun() {
     setRunning(true);
     setError(null);
+    const prevFinished = data?.finished_at || null;
     try {
-      await runMonitor();
+      await runMonitor(); // returns immediately; work runs in background
+      // poll /api/digest until a NEW run lands (finished_at changes)
+      const started = Date.now();
+      const TIMEOUT = 3 * 60 * 1000; // 3 min ceiling
+      while (Date.now() - started < TIMEOUT) {
+        await new Promise((r) => setTimeout(r, 4000));
+        const fresh = await getDigest();
+        if (fresh.finished_at && fresh.finished_at !== prevFinished) {
+          setData(fresh);
+          setSelected(null);
+          return;
+        }
+      }
       setData(await getDigest());
-      setSelected(null);
+      setError("The run is taking longer than expected — showing the latest available.");
     } catch (e) {
       setError(e.message);
     } finally {

@@ -48,13 +48,28 @@ async def delete_target(link_id: int, user: CurrentUser):
 
 @router.post("/run")
 async def run(user: CurrentUser):
-    """Run the monitor over the user's links, record the run, return changes."""
+    """Start a monitor run in the BACKGROUND and return immediately.
+
+    A full run (scrape + Jev + OpenAI over every target) can take 30-90s, which
+    exceeds the Vercel proxy timeout. So we kick it off as a background task and
+    return right away; the frontend polls /api/digest until the new run lands.
+    """
+    import asyncio
+
     links = await store.list_links(user["id"])
     targets = [{"title": l["title"], "url": l["url"], "question": l["question"]}
                for l in links if l["is_active"]]
-    result = await pipeline.run_daily(targets)
-    await store.record_run(result["briefing"], result["changes"], "manual", user["id"])
-    return result
+
+    async def _work():
+        try:
+            result = await pipeline.run_daily(targets)
+            await store.record_run(result["briefing"], result["changes"],
+                                   "manual", user["id"])
+        except Exception as e:
+            print(f"[run] background run failed for user {user['id']}: {e!r}")
+
+    asyncio.create_task(_work())
+    return {"status": "started"}
 
 
 @router.get("/digest")
