@@ -69,18 +69,18 @@ async def delete_link(link_id: int, user_id: int = SEED_USER_ID) -> bool:
         return row.first() is not None
 
 
-async def record_run(changes: list[dict], trigger: str = "manual",
+async def record_run(briefing: str, changes: list[dict], trigger: str = "manual",
                      user_id: int = SEED_USER_ID) -> None:
-    """Persist a completed run. `changes` is the grouped change list; we store
-    it as JSON in the digest column so the Digest page can render it."""
+    """Persist a completed run. We store {briefing, changes} as JSON in the
+    digest column so the Digest page can render the full digest."""
     import json
+    blob = json.dumps({"briefing": briefing, "changes": changes})
     async with SessionLocal() as s:
         await s.execute(
             text("INSERT INTO runs (user_id, finished_at, survivor_count, "
                  "digest, status, trigger) "
                  "VALUES (:u, now(), :c, :d, 'ok', :trg)"),
-            {"u": user_id, "c": len(changes), "d": json.dumps(changes),
-             "trg": trigger})
+            {"u": user_id, "c": len(changes), "d": blob, "trg": trigger})
         await s.commit()
 
 
@@ -97,11 +97,19 @@ async def get_latest_run(user_id: int = SEED_USER_ID) -> dict | None:
         if r is None:
             return None
         m = r._mapping
+        briefing = ""
+        changes = []
         try:
-            changes = json.loads(m["digest"]) if m["digest"] else []
+            parsed = json.loads(m["digest"]) if m["digest"] else {}
+            if isinstance(parsed, dict):          # new shape {briefing, changes}
+                briefing = parsed.get("briefing", "")
+                changes = parsed.get("changes", [])
+            elif isinstance(parsed, list):        # old shape: bare changes array
+                changes = parsed
         except (json.JSONDecodeError, TypeError):
-            changes = []
+            pass
         return {
+            "briefing": briefing,
             "changes": changes,
             "finished_at": m["finished_at"].isoformat() if m["finished_at"] else None,
             "total": m["survivor_count"],

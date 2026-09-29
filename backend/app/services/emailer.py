@@ -35,12 +35,20 @@ def _section(label: str, colour: str, bg: str, items: list[Change]) -> str:
     )
 
 
-def _build_html(changes: list[Change], counts: dict) -> str:
+def _build_html(briefing: str, changes: list[Change], counts: dict) -> str:
     buckets = {k: [c for c in changes if c.severity == k] for k in SEV}
     sections = "".join(
         _section(*SEV[k], buckets[k]) for k in ("high", "medium", "low")
     )
     digest_link = f"{settings.app_url.rstrip('/')}/digest"
+    brief_html = (
+        f'<div style="border:1px solid #E4E4DD;background:#fff;border-radius:12px;'
+        f'padding:18px 20px;margin:6px 0 22px">'
+        f'<p style="font-size:11px;font-weight:600;letter-spacing:.04em;'
+        f'text-transform:uppercase;color:#8a8f98;margin:0 0 8px">Briefing</p>'
+        f'<p style="font-family:Georgia,serif;font-size:16px;line-height:1.55;'
+        f'color:#1c1c1a;margin:0">{briefing}</p></div>'
+    ) if briefing else ""
     return (
         '<div style="font-family:system-ui,sans-serif;max-width:640px;'
         'line-height:1.5;color:#1c1c1a">'
@@ -48,6 +56,7 @@ def _build_html(changes: list[Change], counts: dict) -> str:
         'Sentinel — change digest</h2>'
         f'<p style="color:#5a5f6b;font-size:14px">'
         f'{counts["high"]} high · {counts["medium"]} medium · {counts["low"]} low</p>'
+        f'{brief_html}'
         f'{sections}'
         f'<div style="margin-top:28px">'
         f'<a href="{digest_link}" style="display:inline-block;background:#1b3a5b;'
@@ -59,8 +68,9 @@ def _build_html(changes: list[Change], counts: dict) -> str:
     )
 
 
-async def send_digest(changes: list[Change], to: str | None = None) -> bool:
-    """Send the digest email listing all changes grouped by severity."""
+async def send_digest(briefing: str, changes: list[Change],
+                      to: str | None = None) -> bool:
+    """Send the digest email: briefing + all changes grouped by severity."""
     recipient = to or settings.digest_to
     if not (settings.resend_api_key and recipient and settings.digest_from):
         raise RuntimeError(
@@ -75,7 +85,7 @@ async def send_digest(changes: list[Change], to: str | None = None) -> bool:
         "from": settings.digest_from,
         "to": [recipient],
         "subject": subject,
-        "html": _build_html(changes, counts),
+        "html": _build_html(briefing, changes, counts),
     }
     headers = {"Authorization": f"Bearer {settings.resend_api_key}"}
     async with httpx.AsyncClient(timeout=30) as client:

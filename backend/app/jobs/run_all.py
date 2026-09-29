@@ -26,7 +26,7 @@ async def _main() -> None:
         try:
             result = await pipeline.run_for_user(u["links"], u["email"])
             total_changes += result["total"]
-            await store.record_run(result["changes"], "scheduled", u["id"])
+            await store.record_run(result["briefing"], result["changes"], "scheduled", u["id"])
             c = result["counts"]
             print(f"  user {u['id']} ({u['email']}): "
                   f"{len(u['links'])} link(s), {result['total']} change(s) "

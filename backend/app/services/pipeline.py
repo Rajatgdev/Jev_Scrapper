@@ -36,15 +36,15 @@ async def run_for_url(url: str, title: str, question: str) -> list[ScoredChunk]:
     return kept
 
 
-async def _collect(targets: list[dict]) -> list[Change]:
-    """Run all targets, keep+summarise changes, return them sorted by severity."""
+async def _collect(targets: list[dict]) -> tuple[str, list[Change]]:
+    """Run all targets, keep+summarise changes. Returns (briefing, sorted changes)."""
     survivors: list[ScoredChunk] = []
     for t in targets:
         survivors.extend(
             await run_for_url(t["url"], t["title"], t["question"]))
-    changes = await summariser.summarise(survivors)   # [] if nothing kept
+    briefing, changes = await summariser.summarise(survivors)  # ("",[]) if none
     changes.sort(key=lambda c: SEV_ORDER.get(c.severity, 3))
-    return changes
+    return briefing, changes
 
 
 def _counts(changes: list[Change]) -> dict:
@@ -55,8 +55,9 @@ def _counts(changes: list[Change]) -> dict:
     }
 
 
-def _result(changes: list[Change]) -> dict:
+def _result(briefing: str, changes: list[Change]) -> dict:
     return {
+        "briefing": briefing,
         "changes": [c.model_dump() for c in changes],
         "counts": _counts(changes),
         "total": len(changes),
@@ -65,15 +66,15 @@ def _result(changes: list[Change]) -> dict:
 
 async def run_for_user(targets: list[dict], email: str) -> dict:
     """Scheduler path: run a user's targets, email them if anything changed."""
-    changes = await _collect(targets)
+    briefing, changes = await _collect(targets)
     if settings.send_email and changes:
-        await emailer.send_digest(changes, email)
-    return _result(changes)
+        await emailer.send_digest(briefing, changes, email)
+    return _result(briefing, changes)
 
 
 async def run_daily(targets: list[dict]) -> dict:
     """Manual /api/run path."""
-    changes = await _collect(targets)
+    briefing, changes = await _collect(targets)
     if settings.send_email and changes:
-        await emailer.send_digest(changes, settings.digest_to)
-    return _result(changes)
+        await emailer.send_digest(briefing, changes, settings.digest_to)
+    return _result(briefing, changes)

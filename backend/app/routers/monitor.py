@@ -53,19 +53,22 @@ async def run(user: CurrentUser):
     targets = [{"title": l["title"], "url": l["url"], "question": l["question"]}
                for l in links if l["is_active"]]
     result = await pipeline.run_daily(targets)
-    await store.record_run(result["changes"], "manual", user["id"])
+    await store.record_run(result["briefing"], result["changes"], "manual", user["id"])
     return result
 
 
 @router.get("/digest")
 async def digest(user: CurrentUser):
-    """The user's latest run: changes grouped by severity, for the Digest page."""
+    """The user's latest run: briefing + changes, for the Digest home page."""
+    source_count = len([l for l in await store.list_links(user["id"]) if l["is_active"]])
     latest = await store.get_latest_run(user["id"])
     if latest is None:
-        return {"changes": [], "counts": {"high": 0, "medium": 0, "low": 0},
-                "total": 0, "finished_at": None}
+        return {"briefing": "", "changes": [],
+                "counts": {"high": 0, "medium": 0, "low": 0},
+                "total": 0, "finished_at": None, "source_count": source_count}
     changes = latest["changes"]
     counts = {k: sum(c.get("severity") == k for c in changes)
               for k in ("high", "medium", "low")}
-    return {"changes": changes, "counts": counts, "total": latest["total"],
-            "finished_at": latest["finished_at"]}
+    return {"briefing": latest.get("briefing", ""), "changes": changes,
+            "counts": counts, "total": latest["total"],
+            "finished_at": latest["finished_at"], "source_count": source_count}

@@ -1,8 +1,11 @@
-"""One OpenAI call per run: write a clean one-line summary for EACH kept change.
+"""One OpenAI call per run. Produces two levels of content for the digest:
 
-Input: the kept ScoredChunks (any severity). Output: a list of Change objects,
-one per chunk, each with a short human summary. Jev already labelled severity;
-OpenAI only writes prose. Returns [] for no input (no call made).
+  - a run-level `briefing`: a short paragraph overview of everything that changed
+  - per change: a `summary` (list row), a `detail` paragraph (panel), and a
+    `quote` (the actual new text on the page).
+
+Jev already labelled severity; OpenAI only writes prose. Returns
+(briefing, changes). No survivors -> ("", []) and no API call.
 """
 import json
 import httpx
@@ -12,22 +15,40 @@ from app.models.schemas import Change, ScoredChunk
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 
 SYSTEM = (
-    "You summarise webpage changes for a monitoring digest. You are given a "
-    "JSON array of changes, each with an index, the page, and the old and new "
-    "text. For each, write ONE short, plain sentence saying what changed. No "
-    "preamble, no speculation. Respond with ONLY a JSON array of objects "
-    '{"index": <int>, "summary": "<one sentence>"}, same length and order as '
-    "the input. Return nothing but the JSON array."
+    "You write a change digest for a website-monitoring tool. You are given a "
+    "JSON array of changes, each with an index, the page it came from, and the "
+    "old and new text. Produce a JSON object with two keys:\n"
+    '  "briefing": a 2-3 sentence plain-English overview of what changed across '
+    "all the pages, leading with the most consequential. Refer to pages by name.\n"
+    '  "changes": an array, SAME length and order as the input, each an object '
+    '{"index": <int>, "summary": "<one short sentence, the headline of this '
+    'change>", "detail": "<a 2-4 sentence paragraph explaining what changed and '
+    'why it may matter>", "quote": "<the key new text now on the page, quoted '
+    'or lightly cleaned; if nothing quotable, a one-line description of the new '
+    'content>"}.\n'
+    "No preamble. Respond with ONLY the JSON object, nothing else."
 )
 
 
-async def summarise(survivors: list[ScoredChunk]) -> list[Change]:
+def _fallback(survivors: list[ScoredChunk]) -> tuple[str, list[Change]]:
+    changes = [
+        Change(page_title=s.chunk.page_title, page_url=s.chunk.page_url,
+               severity=s.verdict.severity,
+               summary=(s.chunk.new_text[:120] or "Content changed"),
+               detail=(s.chunk.new_text[:400] or "The page content changed."),
+               quote=(s.chunk.new_text[:300] or ""))
+        for s in survivors
+    ]
+    return ("Changes were detected across your watched pages.", changes)
+
+
+async def summarise(survivors: list[ScoredChunk]) -> tuple[str, list[Change]]:
     if not survivors:
-        return []
+        return "", []
 
     rows = [
         {"index": i, "page": s.chunk.page_title,
-         "old": s.chunk.old_text[:500], "new": s.chunk.new_text[:500]}
+         "old": s.chunk.old_text[:600], "new": s.chunk.new_text[:600]}
         for i, s in enumerate(survivors)
     ]
     payload = {
@@ -39,30 +60,30 @@ async def summarise(survivors: list[ScoredChunk]) -> list[Change]:
     }
     headers = {"Authorization": f"Bearer {settings.openai_api_key}"}
 
-    async with httpx.AsyncClient(timeout=60) as client:
+    async with httpx.AsyncClient(timeout=90) as client:
         r = await client.post(OPENAI_URL, json=payload, headers=headers)
         r.raise_for_status()
         content = r.json()["choices"][0]["message"]["content"].strip()
 
-    # tolerate a ```json fence if the model adds one
     if content.startswith("```"):
         content = content.strip("`").lstrip("json").strip()
 
-    summaries: dict[int, str] = {}
     try:
-        for item in json.loads(content):
-            summaries[int(item["index"])] = item["summary"]
+        obj = json.loads(content)
+        briefing = str(obj.get("briefing", "")).strip()
+        by_index = {int(it["index"]): it for it in obj.get("changes", [])}
     except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-        # fall back to the raw new text if the model misbehaves
-        summaries = {}
+        return _fallback(survivors)
 
     changes: list[Change] = []
     for i, s in enumerate(survivors):
-        summary = summaries.get(i) or (s.chunk.new_text[:160] or "(content changed)")
+        it = by_index.get(i, {})
         changes.append(Change(
             page_title=s.chunk.page_title,
             page_url=s.chunk.page_url,
             severity=s.verdict.severity,
-            summary=summary,
+            summary=(it.get("summary") or s.chunk.new_text[:120] or "Content changed"),
+            detail=(it.get("detail") or ""),
+            quote=(it.get("quote") or s.chunk.new_text[:300] or ""),
         ))
-    return changes
+    return briefing, changes

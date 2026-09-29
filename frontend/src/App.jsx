@@ -1,43 +1,27 @@
-import { useState } from "react";
 import { Routes, Route, NavLink, Navigate } from "react-router-dom";
-import { LayoutDashboard, ListChecks, FileText, PanelLeftClose, PanelLeft, LogOut } from "lucide-react";
-import Dashboard from "./pages/Dashboard.jsx";
+import { FileText, ListChecks, LogOut } from "lucide-react";
 import Targets from "./pages/Targets.jsx";
 import Digest from "./pages/Digest.jsx";
 import Login from "./pages/Login.jsx";
 import { useAuth } from "./lib/auth";
 
 const NAV = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/", label: "Digest", icon: FileText, end: true },
   { to: "/targets", label: "Targets", icon: ListChecks },
-  { to: "/digest", label: "Digest", icon: FileText },
 ];
 
 export default function App() {
   const { user, loading, logout } = useAuth();
-  const [collapsed, setCollapsed] = useState(false);
-  const [lastRun, setLastRun] = useState(null);
 
-  if (loading) {
-    return <div className="boot">Loading…</div>;
-  }
-  if (!user) {
-    return <Login />;
-  }
+  if (loading) return <div className="boot">Loading…</div>;
+  if (!user) return <Login />;
 
   return (
     <div className="shell">
-      <aside className={`rail${collapsed ? " collapsed" : ""}`}>
+      <aside className="rail">
         <div className="rail-head">
           <span className="mark-dot" />
           <span className="mark">Sentinel</span>
-          <button
-            className="rail-toggle"
-            onClick={() => setCollapsed((c) => !c)}
-            aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
-          >
-            {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
-          </button>
         </div>
 
         <nav className="nav">
@@ -47,27 +31,26 @@ export default function App() {
               to={to}
               end={end}
               className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
-              title={collapsed ? label : undefined}
             >
-              <Icon size={18} />
+              <Icon size={18} className="nav-ico" />
               <span className="nav-label">{label}</span>
             </NavLink>
           ))}
         </nav>
 
         <div className="rail-foot">
-          <button className="nav-item signout" onClick={logout} title={collapsed ? "Sign out" : undefined}>
-            <LogOut size={18} />
+          <button className="nav-item signout" onClick={logout}>
+            <LogOut size={18} className="nav-ico" />
             <span className="nav-label">{user.email}</span>
           </button>
         </div>
       </aside>
+      <div className="rail-spacer" />
 
       <main className="main">
         <Routes>
-          <Route path="/" element={<Dashboard lastRun={lastRun} setLastRun={setLastRun} />} />
+          <Route path="/" element={<Digest />} />
           <Route path="/targets" element={<Targets />} />
-          <Route path="/digest" element={<Digest />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

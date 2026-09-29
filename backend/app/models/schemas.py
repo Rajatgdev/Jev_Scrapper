@@ -43,4 +43,6 @@ class Change(BaseModel):
     page_title: str
     page_url: str
     severity: str          # "high" | "medium" | "low"
-    summary: str           # OpenAI one-liner describing what changed
+    summary: str           # OpenAI one-liner (the list row)
+    detail: str = ""       # OpenAI paragraph — "what changed" in the panel
+    quote: str = ""        # the actual new text on the page (Option B)
