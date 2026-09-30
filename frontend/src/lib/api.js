@@ -44,3 +44,10 @@ export const deleteTarget = (id) =>
   req(`/api/targets/${id}`, { method: "DELETE" });
 export const runMonitor = () => req("/api/run", { method: "POST" });
 export const getDigest = () => req("/api/digest");
+
+// api keys (Settings)
+export const getKeys = () => req("/api/keys");
+export const setKey = (provider, key) =>
+  req(`/api/keys/${provider}`, { method: "PUT", body: JSON.stringify({ key }) });
+export const deleteKey = (provider) =>
+  req(`/api/keys/${provider}`, { method: "DELETE" });

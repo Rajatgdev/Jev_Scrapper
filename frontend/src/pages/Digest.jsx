@@ -88,7 +88,7 @@ export default function Digest() {
     return <div className="wrap"><div className="loading">Loading…</div></div>;
   }
 
-  const { briefing, changes, total, finished_at, source_count } = data;
+  const { briefing, changes, total, finished_at, source_count, keys_configured } = data;
   const when = finished_at ? new Date(finished_at).toLocaleString() : null;
   const sel = selected != null ? changes[selected] : null;
 
@@ -106,6 +106,12 @@ export default function Digest() {
             {when ? ` · ${when}` : ""}
           </p>
 
+          {!keys_configured && (
+            <div className="banner banner-warn">
+              Add your OpenAI, Firecrawl and Jev keys in{" "}
+              <a href="/settings">Settings</a> to start monitoring.
+            </div>
+          )}
           {error && <div className="banner banner-error">{error}</div>}
 
           {total === 0 ? (
@@ -164,7 +170,8 @@ export default function Digest() {
             </div>
           )}
         </div>
-        <button className="run-btn" onClick={onRun} disabled={running}>
+        <button className="run-btn" onClick={onRun} disabled={running || !keys_configured}
+          title={!keys_configured ? "Add your API keys in Settings to run" : undefined}>
           <Play size={15} />
           {running ? "Running…" : "Run now"}
         </button>

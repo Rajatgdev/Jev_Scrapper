@@ -16,7 +16,7 @@ FIRECRAWL_URL = "https://api.firecrawl.dev/v2/scrape"
 CHANGE_TAG = "sentinel-v1"
 
 
-async def scrape_with_diff(url: str) -> tuple[str, str | None]:
+async def scrape_with_diff(url: str, firecrawl_key: str) -> tuple[str, str | None]:
     """Returns (change_status, diff_text_or_None).
 
     change_status is "new" | "same" | "changed" | "removed".
@@ -33,7 +33,7 @@ async def scrape_with_diff(url: str) -> tuple[str, str | None]:
         # markdown that change-tracking compares.
         "onlyMainContent": False,
     }
-    headers = {"Authorization": f"Bearer {settings.firecrawl_api_key}"}
+    headers = {"Authorization": f"Bearer {firecrawl_key}"}
 
     async with httpx.AsyncClient(timeout=90) as client:
         r = await client.post(FIRECRAWL_URL, json=payload, headers=headers)

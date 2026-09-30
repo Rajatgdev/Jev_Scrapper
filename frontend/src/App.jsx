@@ -1,13 +1,15 @@
 import { Routes, Route, NavLink, Navigate } from "react-router-dom";
-import { FileText, ListChecks, LogOut } from "lucide-react";
+import { FileText, ListChecks, Settings as SettingsIcon, LogOut } from "lucide-react";
 import Targets from "./pages/Targets.jsx";
 import Digest from "./pages/Digest.jsx";
+import Settings from "./pages/Settings.jsx";
 import Login from "./pages/Login.jsx";
 import { useAuth } from "./lib/auth";
 
 const NAV = [
   { to: "/", label: "Digest", icon: FileText, end: true },
   { to: "/targets", label: "Targets", icon: ListChecks },
+  { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 export default function App() {
@@ -51,6 +53,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Digest />} />
           <Route path="/targets" element={<Targets />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

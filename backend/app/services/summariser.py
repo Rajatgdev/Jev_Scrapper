@@ -42,7 +42,7 @@ def _fallback(survivors: list[ScoredChunk]) -> tuple[str, list[Change]]:
     return ("Changes were detected across your watched pages.", changes)
 
 
-async def summarise(survivors: list[ScoredChunk]) -> tuple[str, list[Change]]:
+async def summarise(survivors: list[ScoredChunk], openai_key: str) -> tuple[str, list[Change]]:
     if not survivors:
         return "", []
 
@@ -58,7 +58,7 @@ async def summarise(survivors: list[ScoredChunk]) -> tuple[str, list[Change]]:
             {"role": "user", "content": json.dumps(rows)},
         ],
     }
-    headers = {"Authorization": f"Bearer {settings.openai_api_key}"}
+    headers = {"Authorization": f"Bearer {openai_key}"}
 
     async with httpx.AsyncClient(timeout=90) as client:
         r = await client.post(OPENAI_URL, json=payload, headers=headers)

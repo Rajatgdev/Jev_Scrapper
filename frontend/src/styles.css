@@ -190,3 +190,21 @@ a{color:inherit}
   .scrim.show{opacity:1;pointer-events:auto}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.change{opacity:1;transform:none}}
+
+/* ---------- settings / keys ---------- */
+.banner-warn{background:var(--sev-med-bg);color:var(--sev-med)}
+.banner-warn a{color:var(--accent);font-weight:500}
+.keys{display:flex;flex-direction:column;gap:20px}
+.keyrow{border:1px solid var(--hair);background:var(--panel);border-radius:12px;padding:22px 24px}
+.keyrow-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.keyrow-label{font-weight:600;font-size:15px;margin-right:12px}
+.keyrow-status{font-size:12.5px;font-weight:500}
+.keyrow-status.ok{color:var(--sev-low)}
+.keyrow-status.missing{color:var(--faint)}
+.keyrow-hint{font-size:13px;color:var(--slate);margin:2px 0 14px}
+.keyrow-where{color:var(--faint)}
+.keyrow-input{display:flex;gap:10px}
+.keyrow-input input{flex:1;font-family:var(--sans);font-size:14px;padding:10px 12px;border:1px solid var(--hair);border-radius:8px;background:var(--paper);color:var(--ink)}
+.keyrow-input input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(27,58,91,.1)}
+.keyrow-input .btn{white-space:nowrap}
+.keyrow-error{color:var(--sev-high);font-size:13px;margin:10px 0 0}
