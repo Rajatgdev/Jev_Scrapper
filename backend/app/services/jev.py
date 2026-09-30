@@ -41,7 +41,7 @@ def _state(chunk: Chunk) -> dict:
     }
 
 
-async def evaluate(chunk: Chunk) -> Verdict:
+async def evaluate(chunk: Chunk, jev_key: str) -> Verdict:
     """Send one shared state + three typed questions in a single call."""
     payload = {
         "state": _state(chunk),
@@ -62,7 +62,7 @@ async def evaluate(chunk: Chunk) -> Verdict:
             },
         },
     }
-    headers = {"Authorization": f"Bearer {settings.jev_api_key}"}
+    headers = {"Authorization": f"Bearer {jev_key}"}
 
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.post(JEV_URL, json=payload, headers=headers)

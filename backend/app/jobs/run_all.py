@@ -24,7 +24,13 @@ async def _main() -> None:
     total_changes = 0
     for u in users:
         try:
-            result = await pipeline.run_for_user(u["links"], u["email"])
+            keys = await store.get_decrypted_keys(u["id"])
+            missing = [p for p in ("openai", "firecrawl", "jev") if not keys.get(p)]
+            if missing:
+                print(f"  user {u['id']} ({u['email']}): SKIPPED — missing keys "
+                      f"({', '.join(missing)})")
+                continue
+            result = await pipeline.run_for_user(u["links"], u["email"], keys)
             total_changes += result["total"]
             await store.record_run(result["briefing"], result["changes"], "scheduled", u["id"])
             c = result["counts"]

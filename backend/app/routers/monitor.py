@@ -50,11 +50,18 @@ async def delete_target(link_id: int, user: CurrentUser):
 async def run(user: CurrentUser):
     """Start a monitor run in the BACKGROUND and return immediately.
 
-    A full run (scrape + Jev + OpenAI over every target) can take 30-90s, which
-    exceeds the Vercel proxy timeout. So we kick it off as a background task and
-    return right away; the frontend polls /api/digest until the new run lands.
+    Uses the running user's own keys. Returns 400 up-front if any key is
+    missing (the frontend disables the button and points to Settings).
+    A full run can take 30-90s (Vercel proxy timeout), so the actual work runs
+    as a background task; the frontend polls /api/digest until the run lands.
     """
     import asyncio
+
+    keys = await store.get_decrypted_keys(user["id"])
+    missing = [p for p in ("openai", "firecrawl", "jev") if not keys.get(p)]
+    if missing:
+        raise HTTPException(
+            400, f"Add your API keys in Settings to run ({', '.join(missing)}).")
 
     links = await store.list_links(user["id"])
     targets = [{"title": l["title"], "url": l["url"], "question": l["question"]}
@@ -62,7 +69,7 @@ async def run(user: CurrentUser):
 
     async def _work():
         try:
-            result = await pipeline.run_daily(targets)
+            result = await pipeline.run_daily(targets, keys, user["email"])
             await store.record_run(result["briefing"], result["changes"],
                                    "manual", user["id"])
         except Exception as e:
@@ -76,14 +83,19 @@ async def run(user: CurrentUser):
 async def digest(user: CurrentUser):
     """The user's latest run: briefing + changes, for the Digest home page."""
     source_count = len([l for l in await store.list_links(user["id"]) if l["is_active"]])
+    keys = await store.get_user_keys(user["id"])
+    keys_configured = all(keys.get(p, {}).get("configured")
+                          for p in ("openai", "firecrawl", "jev"))
     latest = await store.get_latest_run(user["id"])
     if latest is None:
         return {"briefing": "", "changes": [],
                 "counts": {"high": 0, "medium": 0, "low": 0},
-                "total": 0, "finished_at": None, "source_count": source_count}
+                "total": 0, "finished_at": None, "source_count": source_count,
+                "keys_configured": keys_configured}
     changes = latest["changes"]
     counts = {k: sum(c.get("severity") == k for c in changes)
               for k in ("high", "medium", "low")}
     return {"briefing": latest.get("briefing", ""), "changes": changes,
             "counts": counts, "total": latest["total"],
-            "finished_at": latest["finished_at"], "source_count": source_count}
+            "finished_at": latest["finished_at"], "source_count": source_count,
+            "keys_configured": keys_configured}

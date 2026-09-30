@@ -13,7 +13,7 @@ from app.db import store
 
 router = APIRouter(prefix="/api/keys", tags=["keys"])
 
-PROVIDERS = ("openai", "firecrawl")
+PROVIDERS = ("openai", "firecrawl", "jev")
 
 
 class KeyIn(BaseModel):
@@ -23,13 +23,20 @@ class KeyIn(BaseModel):
 async def _validate(provider: str, key: str) -> None:
     """Live test the key. Raises HTTPException if it doesn't authenticate."""
     try:
-        async with httpx.AsyncClient(timeout=15) as c:
+        async with httpx.AsyncClient(timeout=20) as c:
             if provider == "openai":
                 r = await c.get("https://api.openai.com/v1/models",
                                 headers={"Authorization": f"Bearer {key}"})
-            else:  # firecrawl
+            elif provider == "firecrawl":
                 r = await c.get("https://api.firecrawl.dev/v2/team/credit-usage",
                                 headers={"Authorization": f"Bearer {key}"})
+            else:  # jev — minimal systemone request to check the key authenticates
+                r = await c.post(
+                    "https://api.typesafe.ai/v1/systemone",
+                    headers={"Authorization": f"Bearer {key}"},
+                    json={"state": "validation check", "model": "jev-latest",
+                          "questions": {"ok": {"type": "noul",
+                                               "instructions": "Is this text non-empty?"}}})
     except httpx.RequestError:
         raise HTTPException(503, "Could not reach the provider to validate the key. Try again.")
     if r.status_code in (401, 403):
