@@ -136,3 +136,68 @@ async def all_active_users_with_links() -> list[dict]:
             u["links"].append({"title": m["title"], "url": m["url"],
                                "question": m["question"]})
         return list(users.values())
+    
+
+
+
+async def get_user_keys(user_id: int) -> dict:
+    """Return {provider: {configured, last4, updated_at}}. Never the key."""
+    async with SessionLocal() as s:
+        rows = await s.execute(
+            text("SELECT provider, last4, updated_at FROM user_keys "
+                 "WHERE user_id = :u AND status = 'active'"),
+            {"u": user_id})
+        out = {}
+        for r in rows:
+            m = r._mapping
+            out[m["provider"]] = {
+                "configured": True,
+                "last4": m["last4"],
+                "updated_at": m["updated_at"].isoformat() if m["updated_at"] else None,
+            }
+        return out
+
+
+async def set_user_key(user_id: int, provider: str, ciphertext: str,
+                       last4: str, crypto_version: str, key_id: str) -> None:
+    async with SessionLocal() as s:
+        await s.execute(
+            text("INSERT INTO user_keys "
+                 "(user_id, provider, ciphertext, crypto_version, key_id, last4, updated_at) "
+                 "VALUES (:u, :p, :ct, :cv, :kid, :l4, now()) "
+                 "ON CONFLICT (user_id, provider) DO UPDATE SET "
+                 "ciphertext = EXCLUDED.ciphertext, crypto_version = EXCLUDED.crypto_version, "
+                 "key_id = EXCLUDED.key_id, last4 = EXCLUDED.last4, "
+                 "status = 'active', updated_at = now()"),
+            {"u": user_id, "p": provider, "ct": ciphertext, "cv": crypto_version,
+             "kid": key_id, "l4": last4})
+        await s.commit()
+
+
+async def delete_user_key(user_id: int, provider: str) -> bool:
+    async with SessionLocal() as s:
+        row = await s.execute(
+            text("DELETE FROM user_keys WHERE user_id = :u AND provider = :p "
+                 "RETURNING id"),
+            {"u": user_id, "p": provider})
+        await s.commit()
+        return row.first() is not None
+
+
+async def get_decrypted_keys(user_id: int) -> dict:
+    """Return {'openai': <key>, 'firecrawl': <key>} decrypted. Missing keys are
+    absent. Called per-run by the pipeline. Never logged."""
+    from app.core import crypto
+    async with SessionLocal() as s:
+        rows = await s.execute(
+            text("SELECT provider, ciphertext FROM user_keys "
+                 "WHERE user_id = :u AND status = 'active'"),
+            {"u": user_id})
+        out = {}
+        for r in rows:
+            m = r._mapping
+            try:
+                out[m["provider"]] = crypto.decrypt(m["ciphertext"])
+            except Exception:
+                pass
+        return out
