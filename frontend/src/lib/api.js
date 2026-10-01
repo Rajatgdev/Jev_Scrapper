@@ -51,3 +51,8 @@ export const setKey = (provider, key) =>
   req(`/api/keys/${provider}`, { method: "PUT", body: JSON.stringify({ key }) });
 export const deleteKey = (provider) =>
   req(`/api/keys/${provider}`, { method: "DELETE" });
+
+// schedule (Settings)
+export const getSchedule = () => req("/api/schedule");
+export const setSchedule = (run_hour, timezone) =>
+  req("/api/schedule", { method: "PUT", body: JSON.stringify({ run_hour, timezone }) });

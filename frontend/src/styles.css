@@ -208,3 +208,11 @@ a{color:inherit}
 .keyrow-input input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(27,58,91,.1)}
 .keyrow-input .btn{white-space:nowrap}
 .keyrow-error{color:var(--sev-high);font-size:13px;margin:10px 0 0}
+
+/* ---------- schedule ---------- */
+.schedule{margin-bottom:20px}
+.schedule-row{display:flex;gap:10px;flex-wrap:wrap}
+.schedule-row select{font-family:var(--sans);font-size:14px;padding:10px 12px;border:1px solid var(--hair);border-radius:8px;background:var(--paper);color:var(--ink)}
+.schedule-row select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(27,58,91,.1)}
+.schedule-row select + select{flex:1;min-width:200px}
+.schedule-ok{color:var(--sev-low);font-size:13px;margin:10px 0 0}

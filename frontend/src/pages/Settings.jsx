@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, Trash2, Loader2 } from "lucide-react";
-import { getKeys, setKey, deleteKey } from "../lib/api";
+import { getKeys, setKey, deleteKey, getSchedule, setSchedule } from "../lib/api";
 
 const PROVIDERS = [
   { id: "openai", label: "OpenAI", hint: "Used to write the digest summaries. Starts with sk-…", where: "platform.openai.com/api-keys" },
@@ -28,6 +28,8 @@ export default function Settings() {
       </div>
 
       {error && <div className="banner banner-error">{error}</div>}
+
+      <ScheduleCard />
 
       {keys === null ? (
         <div className="loading">Loading…</div>
@@ -108,6 +110,88 @@ function KeyRow({ provider, state, onChanged }) {
         </button>
       </div>
       {rowError && <p className="keyrow-error">{rowError}</p>}
+    </div>
+  );
+}
+
+const HOURS = Array.from({ length: 24 }, (_, h) => h);
+const fmtHour = (h) => `${h % 12 === 0 ? 12 : h % 12}:00 ${h < 12 ? "AM" : "PM"}`;
+
+function tzList() {
+  try {
+    if (typeof Intl.supportedValuesOf === "function") {
+      return Intl.supportedValuesOf("timeZone");
+    }
+  } catch {}
+  return ["UTC", "Europe/Dublin", "Europe/London", "America/New_York",
+          "America/Los_Angeles", "Asia/Kolkata", "Asia/Tokyo", "Australia/Sydney"];
+}
+
+function ScheduleCard() {
+  const [sched, setSched] = useState(null);
+  const [hour, setHour] = useState(6);
+  const [tz, setTz] = useState("Europe/Dublin");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [err, setErr] = useState(null);
+
+  const zones = tzList();
+  const options = zones.includes(tz) ? zones : [tz, ...zones];
+  const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  useEffect(() => {
+    getSchedule()
+      .then((s) => { setSched(s); setHour(s.run_hour); setTz(s.timezone); })
+      .catch((e) => setErr(e.message));
+  }, []);
+
+  async function save() {
+    setBusy(true);
+    setMsg(null);
+    setErr(null);
+    try {
+      const s = await setSchedule(hour, tz);
+      setSched(s);
+      setMsg(`Saved. Your digest runs daily at ${fmtHour(s.run_hour)} (${s.timezone}).`);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="keyrow schedule">
+      <div className="keyrow-head">
+        <span className="keyrow-label">Daily digest time</span>
+        {sched && (
+          <span className="keyrow-status ok">{fmtHour(sched.run_hour)} · {sched.timezone}</span>
+        )}
+      </div>
+      <p className="keyrow-hint">
+        Sentinel checks your pages and emails your digest once a day at this time.
+        It can start up to an hour after the time you pick.
+      </p>
+      <div className="schedule-row">
+        <select value={hour} onChange={(e) => setHour(Number(e.target.value))}>
+          {HOURS.map((h) => <option key={h} value={h}>{fmtHour(h)}</option>)}
+        </select>
+        <select value={tz} onChange={(e) => setTz(e.target.value)}>
+          {options.map((z) => <option key={z} value={z}>{z}</option>)}
+        </select>
+        <button className="btn btn-primary btn-sm" onClick={save} disabled={busy || !sched}>
+          {busy ? <Loader2 size={14} className="spin" /> : <Check size={14} />}
+          Save
+        </button>
+      </div>
+      {browserTz && browserTz !== tz && (
+        <p className="keyrow-hint">
+          Your browser's timezone is {browserTz}.{" "}
+          <button className="linklike" onClick={() => setTz(browserTz)}>Use it</button>
+        </p>
+      )}
+      {msg && <p className="schedule-ok">{msg}</p>}
+      {err && <p className="keyrow-error">{err}</p>}
     </div>
   );
 }
