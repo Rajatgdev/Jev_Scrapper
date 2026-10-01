@@ -84,7 +84,10 @@ async def run_for_user(targets: list[dict], email: str, keys: dict) -> dict:
     _require_keys(keys)
     briefing, changes = await _collect(targets, keys)
     if settings.send_email and changes:
-        await emailer.send_digest(briefing, changes, email)
+        try:
+            await emailer.send_digest(briefing, changes, email)
+        except Exception as e:
+            print(f"    [email] send failed for {email}: {e!r}")
     return _result(briefing, changes)
 
 
@@ -95,5 +98,8 @@ async def run_daily(targets: list[dict], keys: dict,
     briefing, changes = await _collect(targets, keys)
     recipient = email or settings.digest_to
     if settings.send_email and changes:
-        await emailer.send_digest(briefing, changes, recipient)
+        try:
+            await emailer.send_digest(briefing, changes, recipient)
+        except Exception as e:
+            print(f"    [email] send failed for {recipient}: {e!r}")
     return _result(briefing, changes)
