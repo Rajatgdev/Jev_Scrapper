@@ -25,7 +25,7 @@ export default function Digest() {
     const START = 10, END = 150;
     const onScroll = () => {
       const p = Math.max(0, Math.min(1, (el.scrollTop - START) / (END - START)));
-      el.style.setProperty("--p", p.toFixed(3));
+      el.parentElement.style.setProperty("--p", p.toFixed(3));
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
@@ -209,7 +209,7 @@ export default function Digest() {
                   <div className="d-quote"><span className="newtag">New content</span>{sel.quote}</div>
                 </div>
               )}
-              <a className="d-visit" href={sel.page_url} target="_blank" rel="noreferrer">
+              <a className="d-visit" href={sel.item_url || sel.page_url} target="_blank" rel="noreferrer">
                 Open the live page <ExternalLink size={14} />
               </a>
             </div>
