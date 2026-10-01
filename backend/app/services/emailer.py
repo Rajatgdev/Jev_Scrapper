@@ -4,11 +4,13 @@ each a one-line summary, with a button to open the full digest in the app.
 Contract: POST https://api.resend.com/emails, Bearer auth, {from,to,subject,html}.
 """
 import html as _html
+from email.utils import parseaddr
+
 import httpx
 from app.core.config import settings
 from app.models.schemas import Change
 
-RESEND_URL = "https://api.resend.com/emails"
+BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 
 SEV = {
     "high":   ("High",   "#A6362E", "#F6E9E7"),
@@ -72,23 +74,32 @@ async def send_digest(briefing: str, changes: list[Change],
                       to: str | None = None) -> bool:
     """Send the digest email: briefing + all changes grouped by severity."""
     recipient = to or settings.digest_to
-    if not (settings.resend_api_key and recipient and settings.digest_from):
+    if not (settings.brevo_api_key and recipient and settings.digest_from):
         raise RuntimeError(
-            "Email not configured: set RESEND_API_KEY, DIGEST_FROM, and a recipient"
+            "Email not configured: set BREVO_API_KEY, DIGEST_FROM, and a recipient"
         )
     counts = {k: sum(c.severity == k for c in changes) for k in SEV}
     total = len(changes)
     subject = (f"Sentinel: {total} change(s) — "
                f"{counts['high']} high, {counts['medium']} med, {counts['low']} low")
 
+    # DIGEST_FROM looks like: Sentinel <you@example.com>. Brevo wants the name
+    # and email separately, and the email must be a verified Brevo sender.
+    sender_name, sender_email = parseaddr(settings.digest_from)
     payload = {
-        "from": settings.digest_from,
-        "to": [recipient],
+        "sender": {"name": sender_name or "Sentinel", "email": sender_email},
+        "to": [{"email": recipient}],
         "subject": subject,
-        "html": _build_html(briefing, changes, counts),
+        "htmlContent": _build_html(briefing, changes, counts),
     }
-    headers = {"Authorization": f"Bearer {settings.resend_api_key}"}
+    headers = {
+        "api-key": settings.brevo_api_key,
+        "accept": "application/json",
+        "content-type": "application/json",
+    }
     async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.post(RESEND_URL, json=payload, headers=headers)
+        r = await client.post(BREVO_URL, json=payload, headers=headers)
+        if r.status_code >= 400:
+            print(f"    [email] brevo error {r.status_code}: {r.text[:300]}")
         r.raise_for_status()
     return True
