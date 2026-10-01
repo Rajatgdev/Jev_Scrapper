@@ -7,6 +7,7 @@ from sqlalchemy import text
 from app.core.config import settings
 from app.routers import monitor
 from app.routers import keys as keys_router
+from app.routers import schedule as schedule_router
 from app.auth.router import router as auth_router
 from app.db.session import SessionLocal
 
@@ -23,6 +24,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(monitor.router)
 app.include_router(keys_router.router)
+app.include_router(schedule_router.router)
 
 
 @app.get("/health")

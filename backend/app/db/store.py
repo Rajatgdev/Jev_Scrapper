@@ -201,3 +201,45 @@ async def get_decrypted_keys(user_id: int) -> dict:
             except Exception:
                 pass
         return out
+
+
+async def get_schedule(user_id: int) -> dict:
+    """The user's chosen daily run hour (0-23) and IANA timezone."""
+    async with SessionLocal() as s:
+        row = await s.execute(
+            text("SELECT run_hour, timezone FROM users WHERE id = :u"),
+            {"u": user_id})
+        r = row.first()
+        if r is None:
+            return {"run_hour": 6, "timezone": "Europe/Dublin"}
+        return {"run_hour": r._mapping["run_hour"],
+                "timezone": r._mapping["timezone"]}
+
+
+async def set_schedule(user_id: int, run_hour: int, tz: str) -> None:
+    async with SessionLocal() as s:
+        await s.execute(
+            text("UPDATE users SET run_hour = :h, timezone = :tz WHERE id = :u"),
+            {"h": run_hour, "tz": tz, "u": user_id})
+        await s.commit()
+
+
+async def last_scheduled_attempt(user_id: int):
+    """When this user's most recent SCHEDULED run was recorded (any outcome)."""
+    async with SessionLocal() as s:
+        return await s.scalar(
+            text("SELECT max(started_at) FROM runs "
+                 "WHERE user_id = :u AND trigger = 'scheduled'"),
+            {"u": user_id})
+
+
+async def record_failed_run(user_id: int, trigger: str = "scheduled") -> None:
+    """Record a failed attempt so a persistent failure isn't retried (and billed
+    to the user's API keys) every hour. Invisible on the Digest page."""
+    async with SessionLocal() as s:
+        await s.execute(
+            text("INSERT INTO runs (user_id, finished_at, survivor_count, "
+                 "digest, status, trigger) "
+                 "VALUES (:u, now(), 0, NULL, 'error', :trg)"),
+            {"u": user_id, "trg": trigger})
+        await s.commit()
