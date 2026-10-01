@@ -36,7 +36,8 @@ def _fallback(survivors: list[ScoredChunk]) -> tuple[str, list[Change]]:
                severity=s.verdict.severity,
                summary=(s.chunk.new_text[:120] or "Content changed"),
                detail=(s.chunk.new_text[:400] or "The page content changed."),
-               quote=(s.chunk.new_text[:300] or ""))
+               quote=(s.chunk.new_text[:300] or ""),
+               item_url=s.chunk.item_url)
         for s in survivors
     ]
     return ("Changes were detected across your watched pages.", changes)
@@ -85,5 +86,6 @@ async def summarise(survivors: list[ScoredChunk], openai_key: str) -> tuple[str,
             summary=(it.get("summary") or s.chunk.new_text[:120] or "Content changed"),
             detail=(it.get("detail") or ""),
             quote=(it.get("quote") or s.chunk.new_text[:300] or ""),
+            item_url=s.chunk.item_url,
         ))
     return briefing, changes

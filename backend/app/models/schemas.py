@@ -10,6 +10,7 @@ class Chunk(BaseModel):
     old_text: str
     new_text: str
     question: str          # per-target relevance question for Jev
+    item_url: str = ""     # direct link to the specific item (set by the differ)
 
 
 class Verdict(BaseModel):
@@ -46,3 +47,4 @@ class Change(BaseModel):
     summary: str           # OpenAI one-liner (the list row)
     detail: str = ""       # OpenAI paragraph — "what changed" in the panel
     quote: str = ""        # the actual new text on the page (Option B)
+    item_url: str = ""     # direct link to the item; empty -> fall back to page_url
