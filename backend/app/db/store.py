@@ -3,6 +3,11 @@
 Raw SQL over the async session (no ORM models — the schema lives in the .sql
 migrations, this file just queries it). Step A is still effectively single-user:
 everything is scoped to SEED_USER_ID until auth (step B) supplies a real user.
+
+The per-link `question` is stored encrypted (same Fernet master key as the
+user API keys): encrypted on write here, decrypted on read here, so nothing
+above the store layer ever sees ciphertext. Legacy/seed rows are plaintext and
+pass through decrypt_safe unchanged until the next edit re-encrypts them.
 """
 from sqlalchemy import text
 
@@ -16,17 +21,24 @@ MAX_LINKS_PER_USER = 10
 
 
 async def list_links(user_id: int = SEED_USER_ID) -> list[dict]:
+    from app.core import crypto
     async with SessionLocal() as s:
         rows = await s.execute(
             text("SELECT id, title, url, question, is_active "
                  "FROM links WHERE user_id = :u ORDER BY id"),
             {"u": user_id},
         )
-        return [dict(r._mapping) for r in rows]
+        out = []
+        for r in rows:
+            d = dict(r._mapping)
+            d["question"] = crypto.decrypt_safe(d["question"])
+            out.append(d)
+        return out
 
 
 async def add_link(title: str, url: str, question: str,
                    user_id: int = SEED_USER_ID) -> dict:
+    from app.core import crypto
     async with SessionLocal() as s:
         count = await s.scalar(
             text("SELECT count(*) FROM links WHERE user_id = :u"), {"u": user_id})
@@ -41,23 +53,31 @@ async def add_link(title: str, url: str, question: str,
             text("INSERT INTO links (user_id, title, url, question) "
                  "VALUES (:u, :t, :url, :q) "
                  "RETURNING id, title, url, question, is_active"),
-            {"u": user_id, "t": title, "url": url, "q": question})
+            {"u": user_id, "t": title, "url": url, "q": crypto.encrypt(question)})
         await s.commit()
-        return dict(row.one()._mapping)
+        d = dict(row.one()._mapping)
+        d["question"] = crypto.decrypt_safe(d["question"])
+        return d
 
 
 async def update_link(link_id: int, title: str, url: str, question: str,
                       user_id: int = SEED_USER_ID) -> dict | None:
+    from app.core import crypto
     async with SessionLocal() as s:
         row = await s.execute(
             text("UPDATE links SET title = :t, url = :url, question = :q, "
                  "updated_at = now() "
                  "WHERE id = :id AND user_id = :u "
                  "RETURNING id, title, url, question, is_active"),
-            {"id": link_id, "u": user_id, "t": title, "url": url, "q": question})
+            {"id": link_id, "u": user_id, "t": title, "url": url,
+             "q": crypto.encrypt(question)})
         await s.commit()
         r = row.first()
-        return dict(r._mapping) if r else None
+        if r is None:
+            return None
+        d = dict(r._mapping)
+        d["question"] = crypto.decrypt_safe(d["question"])
+        return d
 
 
 async def delete_link(link_id: int, user_id: int = SEED_USER_ID) -> bool:
@@ -122,6 +142,7 @@ async def all_active_users_with_links() -> list[dict]:
     Returns [{id, email, links: [{title, url, question}, ...]}, ...],
     skipping users who have no active links (nothing to run).
     """
+    from app.core import crypto
     async with SessionLocal() as s:
         rows = await s.execute(
             text("SELECT u.id, u.email, l.title, l.url, l.question "
@@ -134,7 +155,7 @@ async def all_active_users_with_links() -> list[dict]:
             u = users.setdefault(m["id"], {"id": m["id"], "email": m["email"],
                                            "links": []})
             u["links"].append({"title": m["title"], "url": m["url"],
-                               "question": m["question"]})
+                               "question": crypto.decrypt_safe(m["question"])})
         return list(users.values())
     
 

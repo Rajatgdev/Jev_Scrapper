@@ -3,9 +3,9 @@ import { Check, Trash2, Loader2 } from "lucide-react";
 import { getKeys, setKey, deleteKey, getSchedule, setSchedule } from "../lib/api";
 
 const PROVIDERS = [
-  { id: "openai", label: "OpenAI", hint: "Used to write the digest summaries. Starts with sk-…", where: "platform.openai.com/api-keys" },
-  { id: "firecrawl", label: "Firecrawl", hint: "Used to scrape and diff your watched pages. Starts with fc-…", where: "firecrawl.dev dashboard" },
-  { id: "jev", label: "Jev (TypeSafe)", hint: "Classifies every change by severity and relevance.", where: "typesafe.ai dashboard" },
+  { id: "openai", label: "OpenAI", hint: "Used to write the digest summaries. Starts with sk-…", where: "platform.openai.com/api-keys", url: "https://platform.openai.com/api-keys" },
+  { id: "firecrawl", label: "Firecrawl", hint: "Used to scrape and diff your watched pages. Starts with fc-…", where: "firecrawl.dev/app/api-keys", url: "https://www.firecrawl.dev/app/api-keys" },
+  { id: "jev", label: "Jev (TypeSafe)", hint: "Classifies every change by severity and relevance.", where: "console.typesafe.ai/keys", url: "https://console.typesafe.ai/keys" },
 ];
 
 export default function Settings() {
@@ -95,7 +95,7 @@ function KeyRow({ provider, state, onChanged }) {
           </button>
         )}
       </div>
-      <p className="keyrow-hint">{provider.hint} <span className="keyrow-where">Get one at {provider.where}.</span></p>
+      <p className="keyrow-hint">{provider.hint} <span className="keyrow-where">Get one at <a className="linklike" href={provider.url} target="_blank" rel="noreferrer noopener">{provider.where}</a>.</span></p>
       <div className="keyrow-input">
         <input
           type="password"
