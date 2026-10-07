@@ -10,6 +10,13 @@ Each chunk also carries `item_url`: the direct link to the specific item it
 describes. Firecrawl diffs the page's MARKDOWN, so an added line keeps its
 [headline](url) syntax and we can read the URL straight out of it. If no usable
 link is present we fall back to the watched page's URL.
+
+Listing pages (news indexes) churn their per-item bylines — a posting time, a
+date, a department tag — on every scrape, with no real content change. Those
+chunks are dropped here, deterministically, before anything reaches Jev. The
+test is strict: a chunk is dropped ONLY when BOTH its old and new text reduce to
+no real words after stripping times/dates/tags. Any sentence or headline — even
+one that merely contains a date — keeps its words and survives.
 """
 import re
 from urllib.parse import urljoin, urldefrag
@@ -21,6 +28,41 @@ _LINK_OPEN = re.compile(r"(?<!!)\[([^\]\n]+)\]\(")
 _SKIP_PREFIXES = ("#", "mailto:", "javascript:", "tel:", "data:")
 _IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico")
 _DECOR = " \t#*_>-"   # markdown decoration around a headline (###, **, bullets)
+
+# --- ephemeral-byline detection (times, dates, bracket tags) ---------------
+# A markdown link keeps its VISIBLE words (a real headline survives); only the
+# (url) part is dropped. Bare [Department of ...] tags are removed whole. Then
+# times, dates and relative-date phrases go. Whatever real words remain decide
+# whether the chunk is pure byline churn.
+_MDLINK = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")          # [text](url) -> text
+_BRACKET = re.compile(r"\[[^\]]*\]")                      # bare [tag]
+_URL = re.compile(r"https?://\S+")
+_TIME = re.compile(r"\b\d{1,2}:\d{2}\s*(?:[ap]\.?m\.?)?", re.I)
+_DATE = re.compile(
+    r"\b\d{1,2}\s+(?:january|february|march|april|may|june|july|august|"
+    r"september|october|november|december)\s+\d{4}\b", re.I)
+_ISO = re.compile(r"\b\d{4}-\d{2}-\d{2}(?:[ t]\d{2}:\d{2}(?::\d{2})?)?\b", re.I)
+_AGO = re.compile(r"\b(?:\d+\s+\w+\s+ago|yesterday|today)\b", re.I)
+_NONWORD = re.compile(r"[^a-z0-9]+")
+
+
+def _meaningful(text: str) -> str:
+    """The real words of a line, with links' URLs, bracket tags, times and dates
+    removed. Empty means the line was nothing but that ephemeral metadata."""
+    t = _MDLINK.sub(r" \1 ", text)      # keep a link's anchor words
+    t = _BRACKET.sub(" ", t)            # drop bare [Department of ...] tags
+    t = _URL.sub(" ", t)
+    for rx in (_ISO, _DATE, _TIME, _AGO):
+        t = rx.sub(" ", t)
+    return _NONWORD.sub("", t.lower())
+
+
+def _is_ephemeral_only(old: str, new: str) -> bool:
+    """True when a chunk's change is nothing but timestamp/date/tag churn — a
+    news-list byline whose only delta is its posting time or department label.
+    Both sides must reduce to no real words, so a chunk with any sentence or
+    headline text is never dropped here."""
+    return not _meaningful(old) and not _meaningful(new)
 
 
 def _markdown_links(line: str):
@@ -126,4 +168,13 @@ def chunks_from_diff(diff_text: str, page_title: str, page_url: str,
             flush()
 
     flush()
-    return [c for c in chunks if c.old_text or c.new_text]
+
+    kept: list[Chunk] = []
+    for c in chunks:
+        if not (c.old_text or c.new_text):
+            continue
+        if _is_ephemeral_only(c.old_text, c.new_text):
+            print(f"    [differ] dropped ephemeral chunk: {c.new_text[:80]!r}")
+            continue
+        kept.append(c)
+    return kept
