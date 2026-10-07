@@ -27,8 +27,15 @@ SEVERITY_CRITERIA = {
     "low": "Cosmetic, navigational, or boilerplate.",
 }
 NOISE_INSTRUCTIONS = (
-    "Is this change purely cosmetic (footer, date stamp, link order, cookie "
-    "notice) with no change in meaning?"
+    "Answer yes only if this change is purely cosmetic or metadata churn with "
+    "no change in actual meaning. Treat as cosmetic (yes): a posting time or "
+    "timestamp changing; a date stamp or 'last updated' date changing; a news "
+    "item's department tag or label changing while its headline and body stay "
+    "the same; reordered links, navigation, footer, or cookie notices. Treat "
+    "as NOT cosmetic (no): a brand-new item or headline appearing; the wording "
+    "of a rule, obligation, guidance, rate, threshold, deadline or scope "
+    "changing; any change to the substance of the text rather than to its "
+    "timestamp, ordering, or labels."
 )
 
 
